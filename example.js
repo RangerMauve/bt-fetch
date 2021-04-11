@@ -27,22 +27,30 @@ async function run () {
 
   console.log('Files:', await res.json())
 
+  const resHTML = await fetch(url, {
+    headers: {
+      Accept: 'text/html'
+    }
+  })
+
+  console.log('As HTML', await resHTML.text())
+
   const srtURL = url + 'Sintel.en.srt'
 
   console.log('Fetching subtitle track metadata')
   console.log(srtURL)
 
-  const res2 = await fetch(srtURL, { method: 'head' })
+  const resHead = await fetch(srtURL, { method: 'head' })
 
-  const { headers, status } = res2
+  const { headers, status } = resHead
 
   console.log({ headers, status })
 
   console.log('Getting contents of srt file')
 
-  const res3 = await fetch(srtURL)
+  const resSRT = await fetch(srtURL)
 
-  for await (const chunk of res3.body) {
+  for await (const chunk of resSRT.body) {
     console.log('Chunk:', chunk)
   }
 
