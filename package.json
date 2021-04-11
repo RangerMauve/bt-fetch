@@ -1,0 +1,35 @@
+{
+  "name": "bt-fetch",
+  "version": "1.0.0",
+  "description": "Interact with Bittorrent the same way you would websites via fetch()",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RangerMauve/bt-fetch.git"
+  },
+  "keywords": [
+    "bittorrent",
+    "bt",
+    "p2p",
+    "fetch",
+    "browser"
+  ],
+  "author": "rangermauve <ranger@mauve.moe> (https://mauve.moe/)",
+  "license": "AGPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/RangerMauve/bt-fetch/issues"
+  },
+  "homepage": "https://github.com/RangerMauve/bt-fetch#readme",
+  "dependencies": {
+    "make-fetch": "^2.3.1",
+    "mime": "^2.5.2",
+    "stream-async-iterator": "^2.0.0",
+    "webtorrent": "^0.116.0"
+  },
+  "devDependencies": {
+    "tmp": "^0.2.1"
+  }
+}
