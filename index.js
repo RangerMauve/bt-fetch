@@ -2,6 +2,7 @@ const makeFetch = require('make-fetch')
 const WebTorrent = require('webtorrent')
 const mime = require('mime/lite')
 const nodeStreamToIterator = require('stream-async-iterator')
+const parseRange = require('range-parser')
 
 module.exports = makeBTFetch
 
@@ -128,6 +129,7 @@ function makeBTFetch ({
           }
           headers['Content-Type'] = getMimeType(path)
           headers['Content-Length'] = `${file.length}`
+          headers['Accept-Ranges'] = 'bytes'
           return {
             statusCode: 200,
             headers,
@@ -173,8 +175,7 @@ function makeBTFetch ({
 <h1>Index of ${pathname}</h1>
 <ul>
   <li><a href="../">../</a></li>${filePaths.map((file) => `
-  <li><a href="./${file}">./${file}</a></li>
-`).join('')}
+  <li><a href="./${file}">${file}</a></li>`).join('')}
 </ul>
 `]
             }
@@ -191,13 +192,31 @@ function makeBTFetch ({
               data: ['Not Found']
             }
           }
-          // TODO: Range queries
+
+          headers['Accept-Ranges'] = 'bytes'
+          headers['Content-Length'] = `${file.length}`
+          const isRanged = reqHeaders.Range || reqHeaders.range
+          const readOpts = {}
+          const statusCode = isRanged ? 206 : 200
+
+          if (isRanged) {
+            const ranges = parseRange(file.length, isRanged)
+            if (ranges && ranges.length && ranges.type === 'bytes') {
+              const [{ start, end }] = ranges
+              const length = (end - start + 1)
+              headers['Content-Length'] = `${length}`
+              headers['Content-Range'] = `bytes ${start}-${end}/${file.length}`
+              readOpts.start = start
+              readOpts.end = end
+            }
+          }
+
           return {
-            statusCode: 200,
+            statusCode,
             headers,
             // WebTorrent streams use readable-stream instead of node
             // They aren't async-iterable yet, so we have to wrap
-            data: nodeStreamToIterator(file.createReadStream())
+            data: nodeStreamToIterator(file.createReadStream(readOpts))
           }
         }
       }
