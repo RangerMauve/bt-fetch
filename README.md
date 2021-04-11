@@ -22,6 +22,11 @@ const res = fetch('bt://08ada5a7a6183aae1e09d831df6748d566095a10/example.html')
 
 const cotent = await res.text()
 
+// How big is the file in bytes (useful in HEAD requests)
+const length = res.headers.get('Content-Length')
+// How much of the file has been downloaded in bytes
+const downloaded = res.headers.get('X-Downloaded')
+
 // List files / subfolders as JSON
 const res = await fetch('bt://infohash/path/')
 

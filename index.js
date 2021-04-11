@@ -113,6 +113,7 @@ function makeBTFetch ({
           const wantsHTML = reqHeaders.accept && reqHeaders.accept.includes('text/html')
           const contentType = wantsHTML ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
           headers['Content-Type'] = contentType
+          headers['X-Downloaded'] = `${file.downloaded}`
           return {
             statusCode: 200,
             headers,
