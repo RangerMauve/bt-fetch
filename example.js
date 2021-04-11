@@ -44,7 +44,10 @@ async function run () {
 
   const { headers, status } = resHead
 
-  console.log({ headers, status })
+  console.log({
+    headers: [...headers],
+    status
+  })
 
   console.log('Getting contents of srt file')
 
