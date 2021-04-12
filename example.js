@@ -13,7 +13,7 @@ const fetch = makeBTFetch({
 // InfoHash for the Sintel torrent
 // Taken from https://webtorrent.io/docs
 // Note how the torrent contains a Sintel folder at the root.
-const url = 'bt://08ada5a7a6183aae1e09d831df6748d566095a10/Sintel/'
+const url = 'bittorrent://08ada5a7a6183aae1e09d831df6748d566095a10/Sintel/'
 
 run()
 

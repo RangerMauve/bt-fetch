@@ -1,5 +1,5 @@
 # bt-fetch
-Interact with Bittorrent the same way you would websites via fetch() and `bt://` URLs
+Interact with Bittorrent the same way you would websites via fetch() and `bittorrent://` URLs
 
 ## How it works
 
@@ -18,7 +18,7 @@ const fetch = require('bt-fetch')({
 })
 
 // Get a file as text
-const res = fetch('bt://08ada5a7a6183aae1e09d831df6748d566095a10/example.html')
+const res = fetch('bittorrent://08ada5a7a6183aae1e09d831df6748d566095a10/example.html')
 
 const cotent = await res.text()
 
@@ -28,12 +28,12 @@ const length = res.headers.get('Content-Length')
 const downloaded = res.headers.get('X-Downloaded')
 
 // List files / subfolders as JSON
-const res = await fetch('bt://infohash/path/')
+const res = await fetch('bittorrent://infohash/path/')
 
 const files = await res.json()
 
 // List the contents as a web page
-const res = await fetch('bt://infohash/path/', {headers: {
+const res = await fetch('bittorrent://infohash/path/', {headers: {
   Accept: 'text/html'
 })
 
@@ -42,7 +42,7 @@ const page = await res.text()
 
 ## TODO
 
-- Headers for `downloaded` bytes and `progress`
+- Pass querystring params from magnet link info (trackers, etc)
 - Support `index.html` resolution (with opt-out)
 - Creating torrents using POST
 - Mutable torrents (GET / POST)

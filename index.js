@@ -8,6 +8,7 @@ module.exports = makeBTFetch
 
 // 30 seconds to get a torrent takes a while. 😅
 const DEFAULT_TIMEOUT = 30 * 1000
+const INFO_HASH_MATCH = /^[a-f0-9]{40}$/ig
 
 function makeBTFetch ({
   storageLocation,
@@ -86,7 +87,9 @@ function makeBTFetch ({
         pathname,
         protocol
       } = new URL(url)
-      if (protocol !== 'bt:') throw new Error('Invalid protocol, must be `bt:`')
+      if (protocol !== 'bittorrent:') {
+        throw new Error('Invalid protocol, must be `bittorrent:`')
+      }
       let infoHash = hostname
       let path = pathname.slice(1)
 
@@ -97,6 +100,10 @@ function makeBTFetch ({
         const parts = pathname.slice(2).split('/')
         infoHash = parts[0]
         path = parts.slice(1).join('/')
+      }
+
+      if (!infoHash || !infoHash.match(INFO_HASH_MATCH)) {
+        throw new Error('Infohash must be 40 char hex string')
       }
 
       if (method === 'HEAD') {
@@ -113,7 +120,6 @@ function makeBTFetch ({
           const wantsHTML = reqHeaders.accept && reqHeaders.accept.includes('text/html')
           const contentType = wantsHTML ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
           headers['Content-Type'] = contentType
-          headers['X-Downloaded'] = `${file.downloaded}`
           return {
             statusCode: 200,
             headers,
@@ -131,6 +137,7 @@ function makeBTFetch ({
           headers['Content-Type'] = getMimeType(path)
           headers['Content-Length'] = `${file.length}`
           headers['Accept-Ranges'] = 'bytes'
+          headers['X-Downloaded'] = `${file.downloaded}`
           return {
             statusCode: 200,
             headers,
@@ -169,7 +176,8 @@ function makeBTFetch ({
             return {
               statusCode: 200,
               headers,
-              data: [`
+              data: [
+                Buffer.from(`
 <!DOCTYPE html>
 <title>${url}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -178,10 +186,17 @@ function makeBTFetch ({
   <li><a href="../">../</a></li>${filePaths.map((file) => `
   <li><a href="./${file}">${file}</a></li>`).join('')}
 </ul>
-`]
+`, 'utf8')
+              ]
             }
           } else {
-            return { statusCode: 200, headers, data: [JSON.stringify(filePaths)] }
+            return {
+              statusCode: 200,
+              headers,
+              data: [
+                Buffer.from(JSON.stringify(filePaths), 'utf8')
+              ]
+            }
           }
         } else {
           const file = await getFile(infoHash, path)
@@ -194,8 +209,11 @@ function makeBTFetch ({
             }
           }
 
+          headers['Content-Type'] = getMimeType(path)
           headers['Accept-Ranges'] = 'bytes'
           headers['Content-Length'] = `${file.length}`
+          // TODO: Should this respond to range requests?
+          headers['X-Downloaded'] = `${file.downloaded}`
           const isRanged = reqHeaders.Range || reqHeaders.range
           const readOpts = {}
           const statusCode = isRanged ? 206 : 200
