@@ -1,5 +1,6 @@
 const makeFetch = require('make-fetch')
 const WebTorrent = require('webtorrent')
+const {WebProperty, verify} = require('webproperty/lookup.js')
 const mime = require('mime/lite')
 const nodeStreamToIterator = require('stream-async-iterator')
 const parseRange = require('range-parser')
@@ -15,7 +16,13 @@ function makeBTFetch ({
   loadTimeout = DEFAULT_TIMEOUT,
   ...opts
 } = {}) {
+  if(opts.dht){
+    opts.dht.verify = verify
+  } else {
+    opts.dht = {verify}
+  }
   const client = new WebTorrent(opts)
+  const domain = new WebProperty({dht: client.dht, check: false})
 
   // Promises for torrents currently being loaded
   const getting = new Map()
@@ -100,6 +107,18 @@ function makeBTFetch ({
         const parts = pathname.slice(2).split('/')
         infoHash = parts[0]
         path = parts.slice(1).join('/')
+      }
+
+      if(infoHash && infoHash.length === 64){
+        infoHash = await new Promise((resolve, reject) => {
+          domain.resolve(infoHash, (error, data) => {
+            if(error){
+              reject(null)
+            } else {
+              resolve(data.infoHash)
+            }
+          })
+        })
       }
 
       if (!infoHash || !infoHash.match(INFO_HASH_MATCH)) {
