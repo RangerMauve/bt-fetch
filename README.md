@@ -38,6 +38,9 @@ const res = await fetch('bittorrent://infohash/path/', {headers: {
 })
 
 const page = await res.text()
+
+// now also supports public keys bittorrent://64CharacterPublicKeyHere
+const pubRes = fetch('bittorrent://1e267e045c1abcb9af26df782a048a1cfd2d26e6db23ff5026b213ce037301bf')
 ```
 
 ## TODO
