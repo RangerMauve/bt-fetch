@@ -28,6 +28,7 @@
     "mime": "^2.5.2",
     "range-parser": "^1.2.1",
     "stream-async-iterator": "^2.0.0",
+    "webproperty": "^1.6.3",
     "webtorrent": "^0.116.0"
   },
   "devDependencies": {
