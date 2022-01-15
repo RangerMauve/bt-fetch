@@ -5,7 +5,7 @@ const streamToIterator = require('stream-async-iterator')
 const mime = require('mime/lite')
 
 const checkHash = new RegExp('^[a-fA-F0-9]{40}$')
-const checkKey = new RegExp('^[a-fA-F0-9]{64}$')
+const checkAddress = new RegExp('^[a-fA-F0-9]{64}$')
 const checkTitle = new RegExp('^[a-f0-9]{32}$')
 const DEFAULT_OPTS = {
     folder: __dirname,
@@ -40,7 +40,7 @@ module.exports = function makeBTFetch(opts = {}){
           try {
               let {hostname, pathname, protocol, searchParams} = new URL(url)
 
-              if((protocol !== 'bt:' || !method || !SUPPORTED_METHODS.includes(method) || !hostname) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length !== 1 && !checkTitle.test(hostname) && !checkHash.test(hostname) && !checkKey.test(hostname))){
+              if((protocol !== 'bt:' || !method || !SUPPORTED_METHODS.includes(method) || !hostname) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length !== 1 && !checkTitle.test(hostname) && !checkHash.test(hostname) && !checkAddress.test(hostname))){
                   console.log('something wrong with the query')
                   throw new Error('invalid query, must be a valid query')
               }
@@ -54,9 +54,9 @@ module.exports = function makeBTFetch(opts = {}){
                     let mainData = null
                     if(req.mainType){
                         if(req.mainReq){
-                            mainData = ['<html><head><title>Config</title></head><body><div>' + '<p>timeout: ' + app._status.timeout + '</p>' + '<p>Torrents: ' + app.webtorrent.torrents.length + '</p><div></body></html>']
+                            mainData = ['<html><head><title>Config</title></head><body><div>' + '<p>timeout: ' + app._status.timeout + '</p>' + '<p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '<p>current: ' + app._status.current + '<p>share: ' + app._status.share + '</p></p></p><div></body></html>']
                         } else {
-                            mainData = [JSON.stringify({timeout: app._timeOut, torrents: app.webtorrent.torrents.length})]
+                            mainData = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
                         }
                         res.data = mainData
                         res.statusCode = 200
@@ -180,9 +180,9 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.set(torrent.address, torrent)
                             }
                             if(req.mainReq){
-                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>address: ${torrent.address}</p></div></body></html>`]
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
                             } else {
-                                mainData = [JSON.stringify({address: torrent.address})]
+                                mainData = [JSON.stringify({address: torrent.address, infoHash: torrent.infoHash})]
                             }
                         } else if(req.mainQuery.length === 32){
                             let torrent = await app.ownTitle(req.mainQuery)
@@ -193,9 +193,9 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.set(torrent.infoHash, torrent)
                             }
                             if(req.mainReq){
-                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>title: ${torrent.title}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
                             } else {
-                                mainData = [JSON.stringify({infoHash: torrent.infoHash})]
+                                mainData = [JSON.stringify({title: torrent.title, infoHash: torrent.infoHash})]
                             }
                         }
                         res.data = mainData
@@ -216,7 +216,7 @@ module.exports = function makeBTFetch(opts = {}){
                             }
                             prog.clear()
                             // mainData = [await app.clearData()]
-                            // prog.clear(                 )
+                            // prog.clear()
                         } else {
                             if(body.hash){
                                 if(req.mainReq){
@@ -254,6 +254,7 @@ module.exports = function makeBTFetch(opts = {}){
                         res.statusCode = 200
                         res.headers['Content-Type'] = req.mainRes
                     } else {
+                        let checkCode = null
                         if(req.mainQuery.length === 64){
                             if(req.mainReq){
                                 mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopAddress(req.mainQuery)}</p></div></body></html>`]
@@ -263,6 +264,9 @@ module.exports = function makeBTFetch(opts = {}){
                             // mainData = [app.stopAddress(req.mainQuery)]
                             if(prog.has(req.mainQuery)){
                                 prog.delete(req.mainQuery)
+                                checkCode = 200
+                            } else {
+                                checkCode = 400
                             }
                         } else if(req.mainQuery.length === 40){
                             if(req.mainReq){
@@ -273,6 +277,9 @@ module.exports = function makeBTFetch(opts = {}){
                             // mainData = [app.stopHash(req.mainQuery)]
                             if(prog.has(req.mainQuery)){
                                 prog.delete(req.mainQuery)
+                                checkCode = 200
+                            } else {
+                                checkCode = 400
                             }
                         } else if(req.mainQuery.length === 32){
                             if(req.mainReq){
@@ -283,27 +290,14 @@ module.exports = function makeBTFetch(opts = {}){
                             // mainData = [app.stopTitle(req.mainQuery)]
                             if(prog.has(req.mainQuery)){
                                 prog.delete(req.mainQuery)
+                                checkCode = 200
+                            } else {
+                                checkCode = 400
                             }
                         }
                         res.data = mainData
-                        res.statusCode = 200
+                        res.statusCode = checkCode
                         res.headers['Content-Type'] = req.mainRes
-                    }
-                    break
-                }
-
-                case 'PATCH': {
-                    let mainData = null
-                    if(req.mainType){
-                        mainData = [app.backToDefault()]
-                        res.data = mainData
-                        res.statusCode = 200
-                        res.headers = {}
-                    } else {
-                        mainData = app.configure(req.mainQuery, body) ? ['status was changed'] : []
-                        res.data = mainData
-                        res.statusCode = mainData.length ? 200 : 400
-                        res.headers = {}
                     }
                     break
                 }
