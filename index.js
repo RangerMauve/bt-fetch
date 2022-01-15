@@ -1,291 +1,365 @@
 const makeFetch = require('make-fetch')
-const WebTorrent = require('webtorrent')
-const {WebProperty, verify} = require('webproperty/lookup.js')
+const path = require('path')
+const fs = require('fs-extra')
+const BTP = require('btp-torrent')
+const streamToIterator = require('stream-async-iterator')
 const mime = require('mime/lite')
-const nodeStreamToIterator = require('stream-async-iterator')
-const parseRange = require('range-parser')
 
-module.exports = makeBTFetch
-
-// 30 seconds to get a torrent takes a while. 😅
-const DEFAULT_TIMEOUT = 30 * 1000
-const INFO_HASH_MATCH = /^[a-f0-9]{40}$/ig
-
-function makeBTFetch ({
-  storageLocation,
-  loadTimeout = DEFAULT_TIMEOUT,
-  ...opts
-} = {}) {
-  if(opts.dht){
-    opts.dht.verify = verify
-  } else {
-    opts.dht = {verify}
-  }
-  const client = new WebTorrent(opts)
-  const domain = new WebProperty({dht: client.dht, check: false})
-
-  // Promises for torrents currently being loaded
-  const getting = new Map()
-  // Map of infoHash to torrent
-  const torrents = new Map()
-
-  async function getTorrent (infoHash) {
-    if (torrents.has(infoHash)) return torrents.get(infoHash)
-    if (getting.has(infoHash)) return getting.get(infoHash)
-
-    const promise = Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => {
-          reject(new Error(`Timed out: ${infoHash} after ${loadTimeout}ms`))
-        }, loadTimeout)
-      }),
-      new Promise((resolve, reject) => {
-        const finalOpts = { ...opts }
-        const torrentInfo = {
-          infoHash,
-          // Disable loading any files on start
-          // https://github.com/webtorrent/webtorrent/issues/164#issuecomment-703489174
-          so: '-1'
-        }
-        if (storageLocation) finalOpts.path = storageLocation + infoHash
-        client.add(torrentInfo, finalOpts, (torrent) => {
-          resolve(torrent)
-        })
-      })
-    ])
-
-    getting.set(infoHash, promise)
-
-    try {
-      const torrent = await promise
-      torrents.set(infoHash, torrent)
-
-      // Load data sparsely by default
-      torrent.files.forEach(file => file.deselect())
-      torrent.deselect(0, torrent.pieces.length - 1, false)
-
-      return torrent
-    } finally {
-      getting.delete(infoHash)
-    }
-  }
-
-  async function getFile (infoHash, filePath) {
-    const torrent = await getTorrent(infoHash)
-
-    return torrent.files.find(({ path }) => path === filePath)
-  }
-
-  async function getDirectoryFiles (infoHash, directoryPath) {
-    const torrent = await getTorrent(infoHash)
-
-    return torrent.files.filter(({ path }) => path.startsWith(directoryPath))
-  }
-
-  const fetch = makeFetch(async (request) => {
-    const {
-      url,
-      method,
-      headers: reqHeaders
-    } = request
-    try {
-      const {
-        hostname,
-        pathname,
-        protocol
-      } = new URL(url)
-      if (protocol !== 'bittorrent:') {
-        throw new Error('Invalid protocol, must be `bittorrent:`')
-      }
-      let infoHash = hostname
-      let path = pathname.slice(1)
-
-      const headers = {}
-
-      if (!infoHash) {
-      // Pathname must look like `
-        const parts = pathname.slice(2).split('/')
-        infoHash = parts[0]
-        path = parts.slice(1).join('/')
-      }
-
-      if(infoHash && infoHash.length === 64){
-        infoHash = await new Promise((resolve, reject) => {
-          domain.resolve(infoHash, (error, data) => {
-            if(error){
-              reject(null)
-            } else {
-              resolve(data.infoHash)
-            }
-          })
-        })
-      }
-
-      if (!infoHash || !infoHash.match(INFO_HASH_MATCH)) {
-        throw new Error('Infohash must be 40 char hex string')
-      }
-
-      if (method === 'HEAD') {
-        if (path.endsWith('/')) {
-          // TODO: index.html resolution
-          const files = await getDirectoryFiles(infoHash, path)
-          if (!files.length) {
-            return {
-              statusCode: 404,
-              headers,
-              data: []
-            }
-          }
-          const wantsHTML = reqHeaders.accept && reqHeaders.accept.includes('text/html')
-          const contentType = wantsHTML ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-          headers['Content-Type'] = contentType
-          return {
-            statusCode: 200,
-            headers,
-            data: []
-          }
-        } else {
-          const file = await getFile(infoHash, path)
-          if (!file) {
-            return {
-              statusCode: 404,
-              headers,
-              data: []
-            }
-          }
-          headers['Content-Type'] = getMimeType(path)
-          headers['Content-Length'] = `${file.length}`
-          headers['Accept-Ranges'] = 'bytes'
-          headers['X-Downloaded'] = `${file.downloaded}`
-          return {
-            statusCode: 200,
-            headers,
-            data: []
-          }
-        }
-      } else if (method === 'GET') {
-        if (path.endsWith('/') || !path) {
-          // TODO: index.html resolution
-          const files = await getDirectoryFiles(infoHash, path)
-          if (!files.length) {
-            return { statusCode: 404, headers, data: [] }
-          }
-          const wantsHTML = reqHeaders.accept && reqHeaders.accept.includes('text/html')
-          const contentType = wantsHTML ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-          headers['Content-Type'] = contentType
-          // TODO: Account for folders
-
-          const filePaths = files
-            .map(({ path: filePath }) => filePath.slice(path.length))
-            .reduce((final, file) => {
-              const segments = file.split('/')
-              // TODO: Concat is probably slow as hell
-              // If the file is directly within this path, add it to the list
-              if (segments.length === 1) return final.concat(file)
-
-              // We've got a file that's in a subfolder of some length
-              // We only want to list a folder that's directly within the path
-              const subpath = segments[0] + '/'
-
-              // If we've already seen a path in this subfolder, ignore this file
-              if (final.includes(subpath)) return final
-              return final.concat(subpath)
-            }, [])
-          if (wantsHTML) {
-            return {
-              statusCode: 200,
-              headers,
-              data: [
-                Buffer.from(`
-<!DOCTYPE html>
-<title>${url}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<h1>Index of ${pathname}</h1>
-<ul>
-  <li><a href="../">../</a></li>${filePaths.map((file) => `
-  <li><a href="./${file}">${file}</a></li>`).join('')}
-</ul>
-`, 'utf8')
-              ]
-            }
-          } else {
-            return {
-              statusCode: 200,
-              headers,
-              data: [
-                Buffer.from(JSON.stringify(filePaths), 'utf8')
-              ]
-            }
-          }
-        } else {
-          const file = await getFile(infoHash, path)
-
-          if (!file) {
-            return {
-              statusCode: 404,
-              headers,
-              data: ['Not Found']
-            }
-          }
-
-          headers['Content-Type'] = getMimeType(path)
-          headers['Accept-Ranges'] = 'bytes'
-          headers['Content-Length'] = `${file.length}`
-          // TODO: Should this respond to range requests?
-          headers['X-Downloaded'] = `${file.downloaded}`
-          const isRanged = reqHeaders.Range || reqHeaders.range
-          const readOpts = {}
-          const statusCode = isRanged ? 206 : 200
-
-          if (isRanged) {
-            const ranges = parseRange(file.length, isRanged)
-            if (ranges && ranges.length && ranges.type === 'bytes') {
-              const [{ start, end }] = ranges
-              const length = (end - start + 1)
-              headers['Content-Length'] = `${length}`
-              headers['Content-Range'] = `bytes ${start}-${end}/${file.length}`
-              readOpts.start = start
-              readOpts.end = end
-            }
-          }
-
-          return {
-            statusCode,
-            headers,
-            // WebTorrent streams use readable-stream instead of node
-            // They aren't async-iterable yet, so we have to wrap
-            data: nodeStreamToIterator(file.createReadStream(readOpts))
-          }
-        }
-      }
-
-      return {
-        statusCode: 400,
-        headers,
-        data: ['Something went wrong']
-      }
-    } catch (e) {
-      return {
-        statusCode: 500,
-        data: [e.stack]
-      }
-    }
-  })
-
-  fetch.destroy = () => {
-    return new Promise((resolve, reject) => {
-      client.destroy((err) => {
-        if (err) reject(err)
-        else resolve()
-      })
-    })
-  }
-
-  return fetch
+const checkHash = new RegExp('^[a-fA-F0-9]{40}$')
+const checkKey = new RegExp('^[a-fA-F0-9]{64}$')
+const checkTitle = new RegExp('^[a-f0-9]{32}$')
+const DEFAULT_OPTS = {
+    folder: __dirname,
+    storage: 'storage',
+    magnet: 'magnet',
 }
 
-function getMimeType (path) {
-  let mimeType = mime.getType(path) || 'text/plain'
-  if (mimeType.startsWith('text/')) mimeType = `${mimeType}; charset=utf-8`
-  return mimeType
+module.exports = function makeGunFetch(opts = {}){
+    const finalOpts = {...DEFAULT_OPTS, ...opts}
+
+    const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'PATCH']
+    // const sideType = '-'
+    const hostType = '_'
+
+    const app = new BTP({folder: finalOpts.folder, storage: finalOpts.storage, magnet: finalOpts.magnet})
+
+    const prog = new Map()
+
+    const fetch = makeFetch(async request => {
+
+        if(request.body !== null){
+            request.body = await getBody(request.body)
+            try {
+                request.body = JSON.parse(request.body)
+            } catch (error) {
+                console.log(error)
+            }
+        }
+
+        const {url, method, headers: reqHeaders, body} = request
+
+          try {
+              let {hostname, pathname, protocol, searchParams} = new URL(url)
+
+              if((protocol !== 'bt:' || !method || !SUPPORTED_METHODS.includes(method) || !hostname) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length !== 1 && !checkTitle.test(hostname) && !checkHash.test(hostname) && !checkKey.test(hostname))){
+                  console.log('something wrong with the query')
+                  throw new Error('invalid query, must be a valid query')
+              }
+
+              let req = formatReq(hostname, pathname, method, searchParams, reqHeaders)
+
+              let res = {statusCode: 400, headers: {}, data: []}
+              switch (req.mainMethod) {
+                  
+                case 'GET': {
+                    let mainData = null
+                    if(req.mainType){
+                        if(req.mainReq){
+                            mainData = ['<html><head><title>Config</title></head><body><div>' + '<p>timeout: ' + app._status.timeout + '</p>' + '<p>Torrents: ' + app.webtorrent.torrents.length + '</p><div></body></html>']
+                        } else {
+                            mainData = [JSON.stringify({timeout: app._timeOut, torrents: app.webtorrent.torrents.length})]
+                        }
+                        res.data = mainData
+                        res.statusCode = 200
+                        res.headers['Content-Type'] = req.mainRes
+                    } else {
+                        let tempData = null
+                        if(req.mainQuery.length === 64){
+                            if(prog.has(req.mainQuery)){
+                                tempData = prog.get(req.mainQuery)
+                            } else {
+                                tempData = await app.loadAddress(req.mainQuery)
+                                prog.set(req.mainQuery, tempData)
+                            }
+                            if(req.mainPath === path.sep){
+                                if(req.mainReq){
+                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                        mainData = [`<html><head><title>BT-Fetch</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
+                                    } else {
+                                        mainData = [`<html><head><title>BT-Fetch</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
+                                    }
+                                } else {
+                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                        mainData = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.address + '/' + file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
+                                    } else {
+                                        mainData = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.address + '/' + file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
+                                    }
+                                }
+                            } else {
+                                // if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                //     mainData = streamToIterator(tempData.files.find(file => {return file.path.replace(tempData.path, '') === req.mainPath}).createReadStream())
+                                // } else {
+                                //     mainData = streamToIterator(tempData.files.find(file => {return file.path.replace(tempData.path + path.sep + tempData.name, '') === req.mainPath}).createReadStream())
+                                // }
+                                mainData = streamToIterator(tempData.files.find(file => {return file.endsWith(req.mainPath)}).createReadStream())
+                            }
+                        } else if(req.mainQuery.length === 40){
+                            if(prog.has(req.mainQuery)){
+                                tempData = prog.get(req.mainQuery)
+                            } else {
+                                tempData = await app.loadHash(req.mainQuery)
+                                prog.set(req.mainQuery, tempData)
+                            }
+                            if(req.mainPath === path.sep){
+                                if(req.mainReq){
+                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                        mainData = [`<html><head><title>BT-Fetch</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.path}</a> - ${file.name}</p>`})}</div></body></html>`]
+                                    } else {
+                                        mainData = [`<html><head><title>BT-Fetch</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.path}</a> - ${file.name}</p>`})}</div></body></html>`]
+                                    }
+                                } else {
+                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                        mainData = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.infoHash + '/' + file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
+                                    } else {
+                                        mainData = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.infoHash + '/' + file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
+                                    }
+                                }
+                            } else {
+                                // if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                //     mainData = streamToIterator(tempData.files.find(file => {return file.path.replace(tempData.path, '') === req.mainPath}).createReadStream())
+                                // } else {
+                                //     mainData = streamToIterator(tempData.files.find(file => {return file.path.replace(tempData.path + path.sep + tempData.name, '') === req.mainPath}).createReadStream())
+                                // }
+                                mainData = streamToIterator(tempData.files.find(file => {return file.path.endsWith(req.mainPath)}).createReadStream())
+                            }
+                        }
+                        res.data = mainData
+                        res.statusCode = 200
+                        res.headers['Content-Type'] = req.mainPath === path.sep ? req.mainRes : getMimeType(req.mainPath)
+                    }
+                  break
+                }
+                
+                case 'POST': {
+                    let mainData = null
+                    if(req.mainType){
+                        if(!body){
+                            if(req.mainReq){
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>`]
+                            } else {
+                                mainData = [JSON.stringify('body is required')]
+                            }
+                        } else {
+                            if(body.address === undefined || body.secret === undefined){
+                                let {torrent, title} = await app.publishHash(body.folder)
+                                if(prog.has(torrent.infoHash)){
+                                    prog.delete(torrent.infoHash)
+                                    prog.set(torrent.infoHash, torrent)
+                                } else {
+                                    prog.set(torrent.infoHash, torrent)
+                                }
+                                if(req.mainReq){
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${title}</p></div></body></html>`]
+                                } else {
+                                    mainData = [JSON.stringify({infohash: torrent.infoHash, title})]
+                                }
+                            } else {
+                                let {torrent, secret} = await app.publishAddress(body.folder, {address: body.address, secret: body.secret})
+                                if(prog.has(torrent.address)){
+                                    prog.delete(torrent.address)
+                                    prog.set(torrent.address, torrent)
+                                } else {
+                                    prog.set(torrent.address, torrent)
+                                }
+                                if(req.mainReq){
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`]
+                                } else {
+                                    mainData = [JSON.stringify({address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret})]
+                                }
+                            }
+                        }
+                        res.data = mainData
+                        res.statusCode = 200
+                        res.headers['Content-Type'] = req.mainRes
+                    } else {
+                        if(req.mainQuery.length === 64){
+                            let torrent = await app.ownAddress(req.mainQuery)
+                            if(prog.has(torrent.address)){
+                                prog.delete(torrent.address)
+                                prog.set(torrent.address, torrent)
+                            } else {
+                                prog.set(torrent.address, torrent)
+                            }
+                            if(req.mainReq){
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>address: ${torrent.address}</p></div></body></html>`]
+                            } else {
+                                mainData = [JSON.stringify({address: torrent.address})]
+                            }
+                        } else if(req.mainQuery.length === 32){
+                            let torrent = await app.ownTitle(req.mainQuery)
+                            if(prog.has(torrent.infoHash)){
+                                prog.delete(torrent.infoHash)
+                                prog.set(torrent.infoHash, torrent)
+                            } else {
+                                prog.set(torrent.infoHash, torrent)
+                            }
+                            if(req.mainReq){
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
+                            } else {
+                                mainData = [JSON.stringify({infoHash: torrent.infoHash})]
+                            }
+                        }
+                        res.data = mainData
+                        res.statusCode = 200
+                        res.headers['Content-Type'] = req.mainRes
+                    }
+                    break
+                }
+
+                case 'DELETE': {
+                    let mainData = null
+                    if(req.mainType){
+                        if(!body){
+                            if(req.mainReq){
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.clearData()}</p></div></body></html>`]
+                            } else {
+                                mainData = [JSON.stringify(await app.clearData())]
+                            }
+                            prog.clear()
+                            // mainData = [await app.clearData()]
+                            // prog.clear(                 )
+                        } else {
+                            if(body.hash){
+                                if(req.mainReq){
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
+                                } else {
+                                    mainData = [JSON.stringify(await app.removeHash(body.hash))]
+                                }
+                                // mainData = [await app.removeHash(body.hash)]
+                                if(prog.has(body.hash)){
+                                    prog.delete(body.hash)
+                                }
+                            } else if(body.address){
+                                if(req.mainReq){
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeAddress(body.address)}</p></div></body></html>`]
+                                } else {
+                                    mainData = [JSON.stringify(await app.removeAddress(body.address))]
+                                }
+                                // mainData = [await app.removeAddress(body.address)]
+                                if(prog.has(body.address)){
+                                    prog.delete(body.address)
+                                }
+                            } else if(body.title){
+                                if(req.mainReq){
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeTitle(body.title)}</p></div></body></html>`]
+                                } else {
+                                    mainData = [JSON.stringify(await app.removeTitle(body.title))]
+                                }
+                                // mainData = [await app.removeTitle(body.title)]
+                                if(prog.has(body.title)){
+                                    prog.delete(body.title)
+                                }
+                            }
+                        }
+                        res.data = mainData
+                        res.statusCode = 200
+                        res.headers['Content-Type'] = req.mainRes
+                    } else {
+                        if(req.mainQuery.length === 64){
+                            if(req.mainReq){
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopAddress(req.mainQuery)}</p></div></body></html>`]
+                            } else {
+                                mainData = [JSON.stringify(app.stopAddress(req.mainQuery))]
+                            }
+                            // mainData = [app.stopAddress(req.mainQuery)]
+                            if(prog.has(req.mainQuery)){
+                                prog.delete(req.mainQuery)
+                            }
+                        } else if(req.mainQuery.length === 40){
+                            if(req.mainReq){
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopHash(req.mainQuery)}</p></div></body></html>`]
+                            } else {
+                                mainData = [JSON.stringify(app.stopHash(req.mainQuery))]
+                            }
+                            // mainData = [app.stopHash(req.mainQuery)]
+                            if(prog.has(req.mainQuery)){
+                                prog.delete(req.mainQuery)
+                            }
+                        } else if(req.mainQuery.length === 32){
+                            if(req.mainReq){
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopTitle(req.mainQuery)}</p></div></body></html>`]
+                            } else {
+                                mainData = [JSON.stringify(app.stopTitle(req.mainQuery))]
+                            }
+                            // mainData = [app.stopTitle(req.mainQuery)]
+                            if(prog.has(req.mainQuery)){
+                                prog.delete(req.mainQuery)
+                            }
+                        }
+                        res.data = mainData
+                        res.statusCode = 200
+                        res.headers['Content-Type'] = req.mainRes
+                    }
+                    break
+                }
+
+                case 'PATCH': {
+                    let mainData = null
+                    if(req.mainType){
+                        mainData = [app.backToDefault()]
+                        res.data = mainData
+                        res.statusCode = 200
+                        res.headers = {}
+                    } else {
+                        mainData = app.configure(req.mainQuery, body) ? ['status was changed'] : []
+                        res.data = mainData
+                        res.statusCode = mainData.length ? 200 : 400
+                        res.headers = {}
+                    }
+                    break
+                }
+              }
+              return res
+
+          } catch (e) {
+              return {statusCode: 500, headers: {}, data: [e.stack]}
+          }
+    })
+
+    async function getBody(body) {
+        let mainData = ''
+      
+        for await (const data of body) {
+          mainData += data
+        }
+      
+        return mainData
+      }
+
+      function getMimeType (path) {
+        let mimeType = mime.getType(path) || 'text/plain'
+        if (mimeType.startsWith('text/')) mimeType = `${mimeType}; charset=utf-8`
+        return mimeType
+      }      
+
+    function formatReq(hostname, pathname, method, search, headers){
+        // let mainType = hostname[0] === hostType || hostname[0] === sideType ? hostname[0] : ''
+        let mainType = hostname[0] === hostType
+        let mainQuery = mainType ? hostname.replace(hostname[0], '') : hostname
+        let mainHost = hostname
+        // if(pathname){
+        //     console.log(decodeURIComponent(pathname))
+        // }
+        let mainPath = pathname ? decodeURIComponent(pathname).replace(/\//g, path.sep) : path.sep
+        let mainMethod = method
+        let mainReq = headers.accept && headers.accept.includes('text/html')
+        let mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
+        let mainReg = search.get('clear') ? true : false
+        return {mainQuery, mainHost, mainPath, mainMethod, mainReg, mainReq, mainRes, mainType}
+    }
+
+    fetch.destroy = () => {
+        return new Promise((resolve, reject) => {
+            app.webtorrent.destroy(error => {
+                if(error){
+                    reject(error)
+                } else {
+                    app.webproperty.clearData().then(res => {resolve(res)}).catch(error => {reject(error)})
+                }
+            })
+        })
+    }
+
+    return fetch
+
 }

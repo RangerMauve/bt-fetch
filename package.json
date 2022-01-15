@@ -23,15 +23,13 @@
     "url": "https://github.com/RangerMauve/bt-fetch/issues"
   },
   "homepage": "https://github.com/RangerMauve/bt-fetch#readme",
-  "dependencies": {
-    "make-fetch": "^2.3.1",
-    "mime": "^2.5.2",
-    "range-parser": "^1.2.1",
-    "stream-async-iterator": "^2.0.0",
-    "webproperty": "^1.6.3",
-    "webtorrent": "^0.116.0"
-  },
   "devDependencies": {
     "tmp": "^0.2.1"
+  },
+  "dependencies": {
+    "btp-torrent": "^1.2.6",
+    "make-fetch": "^2.3.1",
+    "mime": "^3.0.0",
+    "stream-async-iterator": "^2.0.0"
   }
 }
