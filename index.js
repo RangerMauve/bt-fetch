@@ -1,6 +1,5 @@
 const makeFetch = require('make-fetch')
 const path = require('path')
-const fs = require('fs-extra')
 const BTP = require('btp-torrent')
 const streamToIterator = require('stream-async-iterator')
 const mime = require('mime/lite')
