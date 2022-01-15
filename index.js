@@ -14,7 +14,7 @@ const DEFAULT_OPTS = {
     magnet: 'magnet',
 }
 
-module.exports = function makeGunFetch(opts = {}){
+module.exports = function makeBTFetch(opts = {}){
     const finalOpts = {...DEFAULT_OPTS, ...opts}
 
     const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'PATCH']
