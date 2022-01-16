@@ -16,7 +16,7 @@ const DEFAULT_OPTS = {
 module.exports = function makeBTFetch(opts = {}){
     const finalOpts = {...DEFAULT_OPTS, ...opts}
 
-    const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'PATCH']
+    const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'HEAD']
     // const sideType = '-'
     const hostType = '_'
 
@@ -49,18 +49,61 @@ module.exports = function makeBTFetch(opts = {}){
 
               let res = {statusCode: 400, headers: {}, data: []}
               switch (req.mainMethod) {
+
+                case 'HEAD': {
+                    let mainData = []
+                    let checkCode = null
+                    if(req.mainType){
+                        if(req.mainQuery){
+                            if(prog.has(req.mainQuery)){
+                                checkCode = 200
+                            } else {
+                                checkCode = 400
+                            }
+                        } else {
+                            checkCode = 400
+                        }
+                        res.data = mainData
+                        res.statusCode = checkCode
+                        res.headers = {}
+                    } else {
+                        let mainLength = null
+                        if(prog.has(req.mainQuery)){
+                            checkCode = 200
+                            mainLength = prog.get(req.mainQuery).length
+                        } else {
+                            checkCode = 400
+                            mainLength = 0
+                        }
+                        res.data = mainData
+                        res.headers = {'Content-Length': mainLength}
+                        res.statusCode = checkCode
+                    }
+                    break
+                }
                   
                 case 'GET': {
                     let mainData = null
                     if(req.mainType){
-                        if(req.mainReq){
-                            mainData = ['<html><head><title>Config</title></head><body><div>' + '<p>timeout: ' + app._status.timeout + '</p>' + '<p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '<p>current: ' + app._status.current + '<p>share: ' + app._status.share + '</p></p></p><div></body></html>']
+                        if(req.mainQuery){
+                            if(req.mainReq){
+                                mainData = ['<html><head><title>Config</title></head><body><div><p>hostname must be empty</p><div></body></html>']
+                            } else {
+                                mainData = [JSON.stringify('hostname must be empty')]
+                            }
+                            res.data = mainData
+                            res.statusCode = 400
+                            res.headers['Content-Type'] = req.mainRes
                         } else {
-                            mainData = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
+                            if(req.mainReq){
+                                mainData = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><div></body></html>']
+                            } else {
+                                mainData = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
+                            }
+                            res.data = mainData
+                            res.statusCode = 200
+                            res.headers['Content-Type'] = req.mainRes
                         }
-                        res.data = mainData
-                        res.statusCode = 200
-                        res.headers['Content-Type'] = req.mainRes
                     } else {
                         let tempData = null
                         if(req.mainQuery.length === 64){
@@ -254,7 +297,6 @@ module.exports = function makeBTFetch(opts = {}){
                         res.statusCode = 200
                         res.headers['Content-Type'] = req.mainRes
                     } else {
-                        let checkCode = null
                         if(req.mainQuery.length === 64){
                             if(req.mainReq){
                                 mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopAddress(req.mainQuery)}</p></div></body></html>`]
@@ -264,9 +306,6 @@ module.exports = function makeBTFetch(opts = {}){
                             // mainData = [app.stopAddress(req.mainQuery)]
                             if(prog.has(req.mainQuery)){
                                 prog.delete(req.mainQuery)
-                                checkCode = 200
-                            } else {
-                                checkCode = 400
                             }
                         } else if(req.mainQuery.length === 40){
                             if(req.mainReq){
@@ -277,9 +316,6 @@ module.exports = function makeBTFetch(opts = {}){
                             // mainData = [app.stopHash(req.mainQuery)]
                             if(prog.has(req.mainQuery)){
                                 prog.delete(req.mainQuery)
-                                checkCode = 200
-                            } else {
-                                checkCode = 400
                             }
                         } else if(req.mainQuery.length === 32){
                             if(req.mainReq){
@@ -290,13 +326,10 @@ module.exports = function makeBTFetch(opts = {}){
                             // mainData = [app.stopTitle(req.mainQuery)]
                             if(prog.has(req.mainQuery)){
                                 prog.delete(req.mainQuery)
-                                checkCode = 200
-                            } else {
-                                checkCode = 400
                             }
                         }
                         res.data = mainData
-                        res.statusCode = checkCode
+                        res.statusCode = 200
                         res.headers['Content-Type'] = req.mainRes
                     }
                     break
