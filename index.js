@@ -183,7 +183,7 @@ module.exports = function makeBTFetch(opts = {}){
                             }
                         } else {
                             if(body.address === undefined || body.secret === undefined){
-                                let {torrent, title} = await app.publishHash(body.folder)
+                                let {torrent, title} = await app.publishTitle(body.folder)
                                 if(prog.has(torrent.infoHash)){
                                     prog.delete(torrent.infoHash)
                                     prog.set(torrent.infoHash, torrent)

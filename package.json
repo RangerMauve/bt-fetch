@@ -1,6 +1,6 @@
 {
   "name": "bt-fetch",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Interact with Bittorrent the same way you would websites via fetch()",
   "main": "index.js",
   "scripts": {
@@ -27,7 +27,7 @@
     "tmp": "^0.2.1"
   },
   "dependencies": {
-    "btp-torrent": "^1.2.6",
+    "btp-torrent": "^1.2.7",
     "make-fetch": "^2.3.1",
     "mime": "^3.0.0",
     "stream-async-iterator": "^2.0.0"
