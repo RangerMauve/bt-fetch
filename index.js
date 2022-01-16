@@ -250,18 +250,26 @@ module.exports = function makeBTFetch(opts = {}){
 
                 case 'DELETE': {
                     let mainData = null
+                    let checkCode = null
                     if(req.mainType){
                         if(!body){
                             if(req.mainReq){
-                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.clearData()}</p></div></body></html>`]
+                                mainData = ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>']
                             } else {
-                                mainData = [JSON.stringify(await app.clearData())]
+                                mainData = [JSON.stringify('body is required')]
                             }
-                            prog.clear()
+                            checkCode = 400
                             // mainData = [await app.clearData()]
                             // prog.clear()
                         } else {
-                            if(body.hash){
+                            if(body.remove !== undefined){
+                                if(req.mainReq){
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.clearData(body.remove)}</p></div></body></html>`]
+                                } else {
+                                    mainData = [JSON.stringify(await app.clearData(body.remove))]
+                                }
+                                prog.clear()
+                            } else if(body.hash){
                                 if(req.mainReq){
                                     mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
                                 } else {
@@ -292,9 +300,10 @@ module.exports = function makeBTFetch(opts = {}){
                                     prog.delete(body.title)
                                 }
                             }
+                            checkCode = 200
                         }
                         res.data = mainData
-                        res.statusCode = 200
+                        res.statusCode = checkCode
                         res.headers['Content-Type'] = req.mainRes
                     } else {
                         if(req.mainQuery.length === 64){
