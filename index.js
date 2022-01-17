@@ -53,20 +53,30 @@ module.exports = function makeBTFetch(opts = {}){
 
                 case 'HEAD': {
                     if(req.mainType){
-                        if(req.mainQuery){
-                            if(prog.has(req.mainQuery)){
-                                res.statusCode = 200
-                            } else {
-                                res.statusCode = 400
-                            }
-                        } else {
-                            res.statusCode = 400
-                        }
+                        res.statusCode = 400
                         res.headers['Content-Length'] = 0
                     } else {
                         if(prog.has(req.mainQuery)){
-                            res.statusCode = 200
-                            res.headers['Content-Length'] = prog.get(req.mainQuery).length
+                            let tempData = prog.get(req.mainQuery)
+                            if(req.mainPath === path.sep){
+                                res.headers['Content-Type'] = req.mainRes
+                                res.headers['Content-Length'] = `${tempData.length}`
+                                res.headers['Accept-Ranges'] = 'bytes'
+                                res.headers['X-Downloaded'] = `${tempData.downloaded}`
+                                res.statusCode = 200
+                            } else {
+                                let foundFile = tempData.files.find(data => {return data.path.endsWith(req.mainPath)})
+                                if(foundFile){
+                                    res.headers['Content-Type'] = getMimeType(req.mainPath)
+                                    res.headers['Content-Length'] = `${foundFile.length}`
+                                    res.headers['Accept-Ranges'] = 'bytes'
+                                    res.headers['X-Downloaded'] = `${foundFile.downloaded}`
+                                    res.statusCode = 200
+                                } else {
+                                    res.statusCode = 400
+                                    res.headers['Content-Length'] = 0
+                                }
+                            }
                         } else {
                             res.statusCode = 400
                             res.headers['Content-Length'] = 0
@@ -131,16 +141,12 @@ module.exports = function makeBTFetch(opts = {}){
                                             req.mainPartial.start = start
                                             req.mainPartial.end = end
 
-                                            res.statusCode = 206
-                                            res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
-                                            res.headers['Content-Type'] = getMimeType(req.mainPath)
                                             res.headers['Content-Length'] = `${length}`
                                             res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
-                                        } else {
-                                            res.data = [JSON.stringify('range can not be used')]
-                                            res.statusCode = 400
-                                            res.headers['Content-Type'] = 'application/json; charset=utf-8'
                                         }
+                                        res.statusCode = 206
+                                        res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
+                                        res.headers['Content-Type'] = getMimeType(req.mainPath)
                                     } else {
                                         res.data = streamToIterator(foundFile.createReadStream())
                                         res.headers['Content-Type'] = getMimeType(req.mainPath)
@@ -176,6 +182,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 }
                                 res.statusCode = 200
                                 res.headers['Content-Type'] = req.mainRes
+                                res.headers['Content-Length'] = tempData.length
                             } else {
                                 foundFile = tempData.files.find(file => {return file.path.endsWith(req.mainPath)})
                                 if(foundFile){
@@ -187,16 +194,12 @@ module.exports = function makeBTFetch(opts = {}){
                                             req.mainPartial.start = start
                                             req.mainPartial.end = end
 
-                                            res.statusCode = 206
-                                            res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
-                                            res.headers['Content-Type'] = getMimeType(req.mainPath)
                                             res.headers['Content-Length'] = `${length}`
                                             res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
-                                        } else {
-                                            res.data = [JSON.stringify('range can not be used')]
-                                            res.statusCode = 400
-                                            res.headers['Content-Type'] = 'application/json; charset=utf-8'
                                         }
+                                        res.statusCode = 206
+                                        res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
+                                        res.headers['Content-Type'] = getMimeType(req.mainPath)
                                     } else {
                                         res.data = streamToIterator(foundFile.createReadStream())
                                         res.headers['Content-Type'] = getMimeType(req.mainPath)
