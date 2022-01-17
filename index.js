@@ -1,6 +1,6 @@
 const makeFetch = require('make-fetch')
 const path = require('path')
-const BTP = require('btp-torrent')
+const BTFetchTorrent = require('bt-fetch-torrent')
 const streamToIterator = require('stream-async-iterator')
 const mime = require('mime/lite')
 
@@ -20,7 +20,7 @@ module.exports = function makeBTFetch(opts = {}){
     // const sideType = '-'
     const hostType = '_'
 
-    const app = new BTP({folder: finalOpts.folder, storage: finalOpts.storage, magnet: finalOpts.magnet})
+    const app = new BTFetchTorrent({folder: finalOpts.folder, storage: finalOpts.storage, magnet: finalOpts.magnet})
 
     const prog = new Map()
 
