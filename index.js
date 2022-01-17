@@ -51,9 +51,10 @@ module.exports = function makeBTFetch(opts = {}){
               switch (req.mainMethod) {
 
                 case 'HEAD': {
-                    let mainData = []
-                    let checkCode = null
                     if(req.mainType){
+                        let mainData = []
+                        let mainLength = 0
+                        let checkCode = null
                         if(req.mainQuery){
                             if(prog.has(req.mainQuery)){
                                 checkCode = 200
@@ -65,9 +66,11 @@ module.exports = function makeBTFetch(opts = {}){
                         }
                         res.data = mainData
                         res.statusCode = checkCode
-                        res.headers = {}
+                        res.headers['Content-Length'] = mainLength
                     } else {
                         let mainLength = null
+                        let mainData = []
+                        let checkCode = null
                         if(prog.has(req.mainQuery)){
                             checkCode = 200
                             mainLength = prog.get(req.mainQuery).length
@@ -76,7 +79,7 @@ module.exports = function makeBTFetch(opts = {}){
                             mainLength = 0
                         }
                         res.data = mainData
-                        res.headers = {'Content-Length': mainLength}
+                        res.headers['Content-Length'] = mainLength
                         res.statusCode = checkCode
                     }
                     break
