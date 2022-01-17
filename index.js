@@ -195,14 +195,7 @@ module.exports = function makeBTFetch(opts = {}){
                             }
                             checkCode = 400
                         } else {
-                            if(!body.folder){
-                                if(req.mainReq){
-                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>folder is required</p></div></body></html>`]
-                                } else {
-                                    mainData = [JSON.stringify('folder is required')]
-                                }
-                                checkCode = 400
-                            } else {
+                            if(body.folder){
                                 if(body.address === undefined || body.secret === undefined){
                                     let {torrent, title} = await app.publishTitle(body.folder)
                                     if(prog.has(torrent.infoHash)){
@@ -216,6 +209,7 @@ module.exports = function makeBTFetch(opts = {}){
                                     } else {
                                         mainData = [JSON.stringify({infohash: torrent.infoHash, title})]
                                     }
+                                    checkCode = 200
                                 } else {
                                     let {torrent, secret} = await app.publishAddress(body.folder, {address: body.address, secret: body.secret})
                                     if(prog.has(torrent.address)){
@@ -229,8 +223,15 @@ module.exports = function makeBTFetch(opts = {}){
                                     } else {
                                         mainData = [JSON.stringify({address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret})]
                                     }
+                                    checkCode = 200
                                 }
-                                checkCode = 200
+                            } else {
+                                if(req.mainReq){
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>body is missing data</p></div></body></html>`]
+                                } else {
+                                    mainData = [JSON.stringify('body is missing data')]
+                                }
+                                checkCode = 400
                             }
                         }
                         res.data = mainData
@@ -277,24 +278,25 @@ module.exports = function makeBTFetch(opts = {}){
                     if(req.mainType){
                         let mainData = null
                         let checkCode = null
-                        if(!body){
+                        if(req.mainQuery){
                             if(req.mainReq){
-                                mainData = ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>']
+                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>hostname must be empty</p></div></body></html>`]
                             } else {
-                                mainData = [JSON.stringify('body is required')]
+                                mainData = [JSON.stringify('hostname must be empty')]
                             }
                             checkCode = 400
-                            // mainData = [await app.clearData()]
-                            // prog.clear()
                         } else {
-                            if(body.remove !== undefined){
+                            if(!body){
                                 if(req.mainReq){
-                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.clearData(body.remove)}</p></div></body></html>`]
+                                    mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.clearData()}</p></div></body></html>`]
                                 } else {
-                                    mainData = [JSON.stringify(await app.clearData(body.remove))]
+                                    mainData = [JSON.stringify(app.clearData())]
                                 }
                                 prog.clear()
-                            } else if(body.hash !== undefined){
+                                checkCode = 400
+                                // mainData = [await app.clearData()]
+                                // prog.clear()
+                            } else if(body.hash){
                                 if(req.mainReq){
                                     mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
                                 } else {
@@ -304,7 +306,8 @@ module.exports = function makeBTFetch(opts = {}){
                                 if(prog.has(body.hash)){
                                     prog.delete(body.hash)
                                 }
-                            } else if(body.address !== undefined){
+                                checkCode = 200
+                            } else if(body.address){
                                 if(req.mainReq){
                                     mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeAddress(body.address)}</p></div></body></html>`]
                                 } else {
@@ -314,7 +317,8 @@ module.exports = function makeBTFetch(opts = {}){
                                 if(prog.has(body.address)){
                                     prog.delete(body.address)
                                 }
-                            } else if(body.title !== undefined){
+                                checkCode = 200
+                            } else if(body.title){
                                 if(req.mainReq){
                                     mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeTitle(body.title)}</p></div></body></html>`]
                                 } else {
@@ -324,8 +328,11 @@ module.exports = function makeBTFetch(opts = {}){
                                 if(prog.has(body.title)){
                                     prog.delete(body.title)
                                 }
+                                checkCode = 200
+                            } else {
+                                mainData = [JSON.stringify('body is missing data')]
+                                checkCode = 400
                             }
-                            checkCode = 200
                         }
                         res.data = mainData
                         res.statusCode = checkCode
