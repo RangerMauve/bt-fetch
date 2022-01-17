@@ -98,9 +98,9 @@ module.exports = function makeBTFetch(opts = {}){
                             checkCode = 400
                         } else {
                             if(req.mainReq){
-                                mainData = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><div></body></html>']
+                                mainData = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><p>clear: ' + app._status.clear + '</p><div></body></html>']
                             } else {
-                                mainData = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
+                                mainData = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, clear: app._status.clear, torrents: app.webtorrent.torrents.length})]
                             }
                             checkCode = 200
                         }
