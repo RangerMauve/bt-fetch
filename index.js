@@ -119,27 +119,39 @@ module.exports = function makeBTFetch(opts = {}){
                                 }
                                 res.statusCode = 200
                                 res.headers['Content-Type'] = req.mainRes
+                                res.headers['Content-Length'] = tempData.length
                             } else {
                                 foundFile = tempData.files.find(file => {return file.endsWith(req.mainPath)})
                                 if(foundFile){
                                     if(req.mainRange){
                                         let ranges = parseRange(foundFile.length, req.mainRange)
-                                        if (ranges && ranges.length && ranges.type === 'bytes') {
+                                        if(ranges && ranges.length && ranges.type === 'bytes'){
                                             let [{ start, end }] = ranges
                                             let length = (end - start + 1)
-                                            res.headers['Content-Length'] = `${length}`
-                                            res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
                                             req.mainPartial.start = start
                                             req.mainPartial.end = end
+
+                                            res.statusCode = 206
+                                            res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
+                                            res.headers['Content-Type'] = getMimeType(req.mainPath)
+                                            res.headers['Content-Length'] = `${length}`
+                                            res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
+                                        } else {
+                                            res.data = [JSON.stringify('range can not be used')]
+                                            res.statusCode = 400
+                                            res.headers['Content-Type'] = 'application/json; charset=utf-8'
                                         }
+                                    } else {
+                                        res.data = streamToIterator(foundFile.createReadStream())
+                                        res.headers['Content-Type'] = getMimeType(req.mainPath)
+                                        res.headers['Content-Length'] = foundFile.length
+                                        res.statusCode = 200
                                     }
-                                    res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
-                                    res.statusCode = 200
                                 } else {
                                     res.data = [JSON.stringify('file was not found')]
                                     res.statusCode = 400
+                                    res.headers['Content-Type'] = 'application/json; charset=utf-8'
                                 }
-                                res.headers['Content-Type'] = getMimeType(req.mainPath)
                             }
                         } else if(req.mainQuery.length === 40){
                             if(prog.has(req.mainQuery)){
@@ -169,22 +181,33 @@ module.exports = function makeBTFetch(opts = {}){
                                 if(foundFile){
                                     if(req.mainRange){
                                         let ranges = parseRange(foundFile.length, req.mainRange)
-                                        if (ranges && ranges.length && ranges.type === 'bytes') {
+                                        if(ranges && ranges.length && ranges.type === 'bytes'){
                                             let [{ start, end }] = ranges
                                             let length = (end - start + 1)
-                                            res.headers['Content-Length'] = `${length}`
-                                            res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
                                             req.mainPartial.start = start
                                             req.mainPartial.end = end
+
+                                            res.statusCode = 206
+                                            res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
+                                            res.headers['Content-Type'] = getMimeType(req.mainPath)
+                                            res.headers['Content-Length'] = `${length}`
+                                            res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
+                                        } else {
+                                            res.data = [JSON.stringify('range can not be used')]
+                                            res.statusCode = 400
+                                            res.headers['Content-Type'] = 'application/json; charset=utf-8'
                                         }
+                                    } else {
+                                        res.data = streamToIterator(foundFile.createReadStream())
+                                        res.headers['Content-Type'] = getMimeType(req.mainPath)
+                                        res.headers['Content-Length'] = foundFile.length
+                                        res.statusCode = 200
                                     }
-                                    res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
-                                    res.statusCode = 200
                                 } else {
                                     res.data = [JSON.stringify('file was not found')]
                                     res.statusCode = 400
+                                    res.headers['Content-Type'] = 'application/json; charset=utf-8'
                                 }
-                                res.headers['Content-Type'] = getMimeType(req.mainPath)
                             }
                         }
                     }
