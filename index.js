@@ -96,9 +96,9 @@ module.exports = function makeBTFetch(opts = {}){
                             res.statusCode = 400
                         } else {
                             if(req.mainReq){
-                                res.data = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><p>clear: ' + app._status.clear + '</p><div></body></html>']
+                                res.data = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><div></body></html>']
                             } else {
-                                res.data = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, clear: app._status.clear, torrents: app.webtorrent.torrents.length})]
+                                res.data = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
                             }
                             res.statusCode = 200
                         }
