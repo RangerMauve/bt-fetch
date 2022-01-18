@@ -27,7 +27,7 @@
     "tmp": "^0.2.1"
   },
   "dependencies": {
-    "bt-fetch-torrent": "^1.3.4",
+    "bt-fetch-torrent": "^1.3.5",
     "make-fetch": "^2.3.1",
     "mime": "^3.0.0",
     "range-parser": "^1.2.1",

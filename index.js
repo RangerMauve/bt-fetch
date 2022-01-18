@@ -11,7 +11,7 @@ const checkTitle = new RegExp('^[a-f0-9]{32}$')
 const DEFAULT_OPTS = {
     folder: __dirname,
     storage: 'storage',
-    magnet: 'magnet',
+    files: 'magnet',
 }
 
 module.exports = function makeBTFetch(opts = {}){
@@ -21,7 +21,7 @@ module.exports = function makeBTFetch(opts = {}){
     // const sideType = '-'
     const hostType = '_'
 
-    const app = new BTFetchTorrent({folder: finalOpts.folder, storage: finalOpts.storage, magnet: finalOpts.magnet})
+    const app = new BTFetchTorrent({folder: finalOpts.folder, storage: finalOpts.storage, files: finalOpts.files})
 
     const prog = new Map()
 
