@@ -21,7 +21,7 @@ module.exports = function makeBTFetch(opts = {}){
     // const sideType = '-'
     const hostType = '_'
 
-    const app = new Main({folder: finalOpts.folder, storage: finalOpts.storage, author: finalOpts.author})
+    const app = new Main(finalOpts)
 
     const prog = new Map()
 
