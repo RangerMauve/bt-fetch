@@ -1,6 +1,6 @@
 const makeFetch = require('make-fetch')
 const path = require('path')
-const BTFetchTorrent = require('bt-fetch-torrent')
+const Main = require('./main.js')
 const streamToIterator = require('stream-async-iterator')
 const mime = require('mime/lite')
 const parseRange = require('range-parser')
@@ -11,7 +11,7 @@ const checkTitle = new RegExp('^[a-f0-9]{32}$')
 const DEFAULT_OPTS = {
     folder: __dirname,
     storage: 'storage',
-    files: 'magnet',
+    author: 'author',
 }
 
 module.exports = function makeBTFetch(opts = {}){
@@ -21,7 +21,7 @@ module.exports = function makeBTFetch(opts = {}){
     // const sideType = '-'
     const hostType = '_'
 
-    const app = new BTFetchTorrent({folder: finalOpts.folder, storage: finalOpts.storage, files: finalOpts.files})
+    const app = new Main({folder: finalOpts.folder, storage: finalOpts.storage, author: finalOpts.author})
 
     const prog = new Map()
 
