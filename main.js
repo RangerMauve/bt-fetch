@@ -286,7 +286,6 @@ class Main {
             const buffAddKey = Buffer.from(address, 'hex')
             const buffSecKey = secret ? Buffer.from(secret, 'hex') : null
             const v = text
-            const buffSig = ed.sign(encodeSigData({seq, v}), buffAddKey, buffSecKey)
       
             let data = null
             let seq = null
@@ -297,6 +296,10 @@ class Main {
             } else {
               seq = 0
             }
+
+            const buffSig = ed.sign(encodeSigData({seq, v}), buffAddKey, buffSecKey)
+
+            
             let putData = await new Promise((resolve, reject) => {
                 this.webtorrent.dht.put({k: buffAddKey, v, seq, sig: buffSig}, (putErr, hash, number) => {
                     if(putErr){
