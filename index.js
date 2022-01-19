@@ -122,7 +122,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 res.headers['Content-Type'] = req.mainRes
                                 res.headers['Content-Length'] = tempData.length
                             } else {
-                                foundFile = tempData.files.find(file => {return file.endsWith(req.mainPath)})
+                                foundFile = tempData.files.find(file => {return file.path.endsWith(req.mainPath)})
                                 if(foundFile){
                                     if(req.mainRange){
                                         let ranges = parseRange(foundFile.length, req.mainRange)
