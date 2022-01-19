@@ -269,7 +269,7 @@ module.exports = function makeBTFetch(opts = {}){
                         res.headers['Content-Type'] = req.mainRes
                     } else {
                         if(req.mainQuery.length === 64){
-                            let torrent = await app.ownAddress(req.mainQuery)
+                            let torrent = await app.currentAddress(req.mainQuery)
                             if(prog.has(torrent.address)){
                                 prog.delete(torrent.address)
                                 prog.set(torrent.address, torrent)
@@ -283,7 +283,7 @@ module.exports = function makeBTFetch(opts = {}){
                             }
                             res.statusCode = 200
                         } else if(req.mainQuery.length === 32){
-                            let torrent = await app.ownTitle(req.mainQuery)
+                            let torrent = await app.currentTitle(req.mainQuery)
                             if(prog.has(torrent.infoHash)){
                                 prog.delete(torrent.infoHash)
                                 prog.set(torrent.infoHash, torrent)
