@@ -298,7 +298,6 @@ class Main {
             }
 
             const buffSig = ed.sign(encodeSigData({seq, v}), buffAddKey, buffSecKey)
-
             
             let putData = await new Promise((resolve, reject) => {
                 this.webtorrent.dht.put({k: buffAddKey, v, seq, sig: buffSig}, (putErr, hash, number) => {
