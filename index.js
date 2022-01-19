@@ -87,21 +87,12 @@ module.exports = function makeBTFetch(opts = {}){
                   
                 case 'GET': {
                     if(req.mainType){
-                        if(req.mainQuery){
-                            if(req.mainReq){
-                                res.data = ['<html><head><title>Config</title></head><body><div><p>hostname must be empty</p><div></body></html>']
-                            } else {
-                                res.data = [JSON.stringify('hostname must be empty')]
-                            }
-                            res.statusCode = 400
+                        if(req.mainReq){
+                            res.data = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><div></body></html>']
                         } else {
-                            if(req.mainReq){
-                                res.data = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><div></body></html>']
-                            } else {
-                                res.data = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
-                            }
-                            res.statusCode = 200
+                            res.data = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
                         }
+                        res.statusCode = 200
                         res.headers['Content-Type'] = req.mainRes
                     } else {
                         let tempData = null
@@ -304,58 +295,49 @@ module.exports = function makeBTFetch(opts = {}){
 
                 case 'DELETE': {
                     if(req.mainType){
-                        if(req.mainQuery){
+                        if(!body){
+                            prog.clear()
                             if(req.mainReq){
-                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>hostname must be empty</p></div></body></html>`]
+                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.clearData()}</p></div></body></html>`]
                             } else {
-                                res.data = [JSON.stringify('hostname must be empty')]
+                                res.data = [JSON.stringify(app.clearData())]
                             }
                             res.statusCode = 400
-                        } else {
-                            if(!body){
-                                prog.clear()
-                                if(req.mainReq){
-                                    res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.clearData()}</p></div></body></html>`]
-                                } else {
-                                    res.data = [JSON.stringify(app.clearData())]
-                                }
-                                res.statusCode = 400
-                                // mainData = [await app.clearData()]
-                                // prog.clear()
-                            } else if(body.hash){
-                                if(prog.has(body.hash)){
-                                    prog.delete(body.hash)
-                                }
-                                if(req.mainReq){
-                                    res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
-                                } else {
-                                    res.data = [JSON.stringify(await app.removeHash(body.hash))]
-                                }
-                                res.statusCode = 200
-                            } else if(body.address){
-                                if(prog.has(body.address)){
-                                    prog.delete(body.address)
-                                }
-                                if(req.mainReq){
-                                    res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeAddress(body.address)}</p></div></body></html>`]
-                                } else {
-                                    res.data = [JSON.stringify(await app.removeAddress(body.address))]
-                                }
-                                res.statusCode = 200
-                            } else if(body.title){
-                                if(prog.has(body.title)){
-                                    prog.delete(body.title)
-                                }
-                                if(req.mainReq){
-                                    res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeTitle(body.title)}</p></div></body></html>`]
-                                } else {
-                                    res.data = [JSON.stringify(await app.removeTitle(body.title))]
-                                }
-                                res.statusCode = 200
-                            } else {
-                                res.data = [JSON.stringify('body is missing data')]
-                                res.statusCode = 400
+                            // mainData = [await app.clearData()]
+                            // prog.clear()
+                        } else if(body.hash){
+                            if(prog.has(body.hash)){
+                                prog.delete(body.hash)
                             }
+                            if(req.mainReq){
+                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
+                            } else {
+                                res.data = [JSON.stringify(await app.removeHash(body.hash))]
+                            }
+                            res.statusCode = 200
+                        } else if(body.address){
+                            if(prog.has(body.address)){
+                                prog.delete(body.address)
+                            }
+                            if(req.mainReq){
+                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeAddress(body.address)}</p></div></body></html>`]
+                            } else {
+                                res.data = [JSON.stringify(await app.removeAddress(body.address))]
+                            }
+                            res.statusCode = 200
+                        } else if(body.title){
+                            if(prog.has(body.title)){
+                                prog.delete(body.title)
+                            }
+                            if(req.mainReq){
+                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeTitle(body.title)}</p></div></body></html>`]
+                            } else {
+                                res.data = [JSON.stringify(await app.removeTitle(body.title))]
+                            }
+                            res.statusCode = 200
+                        } else {
+                            res.data = [JSON.stringify('body is missing data')]
+                            res.statusCode = 400
                         }
                         res.headers['Content-Type'] = req.mainRes
                     } else {
