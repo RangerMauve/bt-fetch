@@ -102,7 +102,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 tempData = prog.get(req.mainQuery)
                             } else {
                                 tempData = await app.loadAddress(req.mainQuery)
-                                prog.set(req.mainQuery, tempData)
+                                prog.set(tempData.address, tempData)
                             }
                             if(req.mainPath === path.sep){
                                 if(req.mainReq){
@@ -155,7 +155,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 tempData = prog.get(req.mainQuery)
                             } else {
                                 tempData = await app.loadHash(req.mainQuery)
-                                prog.set(req.mainQuery, tempData)
+                                prog.set(tempData.infoHash, tempData)
                             }
                             if(req.mainPath === path.sep){
                                 if(req.mainReq){
