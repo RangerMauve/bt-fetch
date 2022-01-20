@@ -429,6 +429,8 @@ class Main {
     // that will have a 32 character md5 hash as it's sub-directory name
     // we do this because we can not name it with the infohash
     // because we do not know the infohash of this torrent beforehand
+    // we return the torrent along with the title
+    // that way the user knows the title when they want to start the torrent
     async publishTitle(folder){
         if(!folder || typeof(folder) !== 'string'){
             throw new Error('path ' + folder + ' does not work')
@@ -521,6 +523,7 @@ class Main {
     }
 
     // publish a new BEP46 torrent, or update an address/public key with a new torrent
+    // we return secret key along with the torrent because the user will need it
     async publishAddress(folder, keypair){
         if(!keypair || !keypair.address || !keypair.secret){
             keypair = this.createKeypair()
