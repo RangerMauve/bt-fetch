@@ -260,7 +260,7 @@ class Main {
             })
         })
         if(!checkHash.test(getData.v.ih.toString('utf-8')) || !Number.isInteger(getData.seq)){
-            reject(new Error('data is invalid'))
+            throw new Error('data is invalid')
         }
         for(const prop in getData.v){
             getData.v[prop] = getData.v[prop].toString('utf-8')
@@ -287,12 +287,12 @@ class Main {
             const buffSecKey = secret ? Buffer.from(secret, 'hex') : null
             const v = text
       
-            let data = null
+            let main = null
             let seq = null
             if(await fs.pathExists(this._author + path.sep + address)){
-              data = await fs.readFile(this._author + path.sep + address)
-              data = JSON.parse(data.toString())
-              seq = data.sequence + 1
+              main = await fs.readFile(this._author + path.sep + address)
+              main = JSON.parse(data.toString())
+              seq = main.sequence + 1
             } else {
               seq = 0
             }
@@ -309,7 +309,7 @@ class Main {
                 })
             })
             let {ih, ...stuff} = text
-            let main = {magnet: `magnet:?xs=${BTPK_PREFIX}${address}`, address, infoHash: ih, sequence: seq, stuff, sig: buffSig.toString('hex'), side: true, ...putData}
+            main = {magnet: `magnet:?xs=${BTPK_PREFIX}${address}`, address, infoHash: ih, sequence: seq, stuff, sig: buffSig.toString('hex'), side: true, ...putData}
             await fs.writeFile(this._author + path.sep + address, JSON.stringify(main))
             return main
       }
@@ -777,6 +777,13 @@ class Main {
     }
 
     // -------------- the below functions are BEP46 helpders, especially bothGetPut which keeps the data active in the dht ----------------
+
+    // this function is used to keep data active in the dht
+    // torrent data is passed in as an argument
+    // it gets the most recent data from another user in the dht
+    // then puts that most recent data back into the dht
+    // if it  can not get the most recent data from another user
+    // then we put the torrent data that we currently have back into the dht
     bothGetPut(data){
         return new Promise((resolve, reject) => {
           const buffAddKey = Buffer.from(data.address, 'hex')
