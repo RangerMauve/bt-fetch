@@ -572,15 +572,13 @@ class Main {
                 })
             })
         ])
-        const tempSecret = checkProperty.secret
         delete checkProperty.infoHash
-        delete checkProperty.secret
         checkProperty.folder = folder.main
         checkProperty.side = true
         for(const prop in checkProperty){
             checkTorrent[prop] = checkProperty[prop]
         }
-        return {torrent: checkTorrent, secret: tempSecret}
+        return {torrent: checkTorrent, secret: keypair.secret}
     }
     
     // ------------- the below functions are for stopping or removing data and torrents
