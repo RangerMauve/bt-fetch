@@ -41,7 +41,7 @@ module.exports = function makeBTFetch(opts = {}){
           try {
               let {hostname, pathname, protocol, searchParams} = new URL(url)
 
-              if((protocol !== 'bt:' || !method || !SUPPORTED_METHODS.includes(method) || !hostname) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length !== 1 && !checkTitle.test(hostname) && !checkHash.test(hostname) && !checkAddress.test(hostname))){
+              if((protocol !== 'bt:' || !method || !SUPPORTED_METHODS.includes(method) || !hostname) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && !checkTitle.test(hostname) && !checkHash.test(hostname) && !checkAddress.test(hostname))){
                   console.log('something wrong with the query')
                   throw new Error('invalid query, must be a valid query')
               }
