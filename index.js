@@ -107,9 +107,9 @@ module.exports = function makeBTFetch(opts = {}){
                             if(req.mainPath === path.sep){
                                 if(req.mainReq){
                                     if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
-                                        res.data = [`<html><head><title>${tempData.name}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
+                                        res.data = [`<html><head><title>${tempData.address}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
                                     } else {
-                                        res.data = [`<html><head><title>${tempData.name}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
+                                        res.data = [`<html><head><title>${tempData.address}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
                                     }
                                 } else {
                                     if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
@@ -160,9 +160,9 @@ module.exports = function makeBTFetch(opts = {}){
                             if(req.mainPath === path.sep){
                                 if(req.mainReq){
                                     if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
-                                        res.data = [`<html><head><title>${tempData.name}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
+                                        res.data = [`<html><head><title>${tempData.infoHash}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
                                     } else {
-                                        res.data = [`<html><head><title>${tempData.name}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
+                                        res.data = [`<html><head><title>${tempData.infoHash}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
                                     }
                                 } else {
                                     if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
