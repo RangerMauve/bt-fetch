@@ -88,7 +88,7 @@ module.exports = function makeBTFetch(opts = {}){
                 case 'GET': {
                     if(req.mainType){
                         if(req.mainReq){
-                            res.data = ['<html><head><title>Config</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><div></body></html>']
+                            res.data = ['<html><head><title>BT-Fetch</title></head><body><div><p>timeout: ' + app._status.timeout + '</p><p>Torrents: ' + app.webtorrent.torrents.length + '</p><p>initial: ' + app._status.initial + '</p><p>current: ' + app._status.current + '</p><p>share: ' + app._status.share + '</p><div></body></html>']
                         } else {
                             res.data = [JSON.stringify({timeout: app._timeOut, share: app._status.share, current: app._status.current, initial: app._status.initial, torrents: app.webtorrent.torrents.length})]
                         }
@@ -223,7 +223,7 @@ module.exports = function makeBTFetch(opts = {}){
                                         prog.set(torrent.infoHash, torrent)
                                     }
                                     if(req.mainReq){
-                                        res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${title}</p></div></body></html>`]
+                                        res.data = [`<html><head><title>${torrent.title}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${title}</p></div></body></html>`]
                                     } else {
                                         res.data = [JSON.stringify({infohash: torrent.infoHash, title})]
                                     }
@@ -237,7 +237,7 @@ module.exports = function makeBTFetch(opts = {}){
                                         prog.set(torrent.address, torrent)
                                     }
                                     if(req.mainReq){
-                                        res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`]
+                                        res.data = [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`]
                                     } else {
                                         res.data = [JSON.stringify({address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret})]
                                     }
@@ -263,7 +263,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.set(torrent.address, torrent)
                             }
                             if(req.mainReq){
-                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
+                                res.data = [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
                             } else {
                                 res.data = [JSON.stringify({address: torrent.address, infoHash: torrent.infoHash})]
                             }
@@ -277,7 +277,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.set(torrent.infoHash, torrent)
                             }
                             if(req.mainReq){
-                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>title: ${torrent.title}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
+                                res.data = [`<html><head><title>${torrent.title}</title></head><body><div><p>title: ${torrent.title}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
                             } else {
                                 res.data = [JSON.stringify({title: torrent.title, infoHash: torrent.infoHash})]
                             }
@@ -305,7 +305,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.delete(body.hash)
                             }
                             if(req.mainReq){
-                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
+                                res.data = [`<html><head><title>${body.hash}</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
                             } else {
                                 res.data = [JSON.stringify(await app.removeHash(body.hash))]
                             }
@@ -315,7 +315,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.delete(body.address)
                             }
                             if(req.mainReq){
-                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeAddress(body.address)}</p></div></body></html>`]
+                                res.data = [`<html><head><title>${body.address}</title></head><body><div><p>${await app.removeAddress(body.address)}</p></div></body></html>`]
                             } else {
                                 res.data = [JSON.stringify(await app.removeAddress(body.address))]
                             }
@@ -325,7 +325,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.delete(body.title)
                             }
                             if(req.mainReq){
-                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${await app.removeTitle(body.title)}</p></div></body></html>`]
+                                res.data = [`<html><head><title>${body.title}</title></head><body><div><p>${await app.removeTitle(body.title)}</p></div></body></html>`]
                             } else {
                                 res.data = [JSON.stringify(await app.removeTitle(body.title))]
                             }
@@ -341,7 +341,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.delete(req.mainQuery)
                             }
                             if(req.mainReq){
-                                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopAddress(req.mainQuery)}</p></div></body></html>`]
+                                res.data = [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${app.stopAddress(req.mainQuery)}</p></div></body></html>`]
                             } else {
                                 res.data = [JSON.stringify(app.stopAddress(req.mainQuery))]
                             }
@@ -351,7 +351,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.delete(req.mainQuery)
                             }
                             if(req.mainReq){
-                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopHash(req.mainQuery)}</p></div></body></html>`]
+                                mainData = [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${app.stopHash(req.mainQuery)}</p></div></body></html>`]
                             } else {
                                 mainData = [JSON.stringify(app.stopHash(req.mainQuery))]
                             }
@@ -361,7 +361,7 @@ module.exports = function makeBTFetch(opts = {}){
                                 prog.delete(req.mainQuery)
                             }
                             if(req.mainReq){
-                                mainData = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.stopTitle(req.mainQuery)}</p></div></body></html>`]
+                                mainData = [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${app.stopTitle(req.mainQuery)}</p></div></body></html>`]
                             } else {
                                 mainData = [JSON.stringify(app.stopTitle(req.mainQuery))]
                             }
