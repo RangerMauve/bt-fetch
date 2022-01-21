@@ -97,6 +97,7 @@ module.exports = function makeBTFetch(opts = {}){
                     } else {
                         let tempData = null
                         let foundFile = null
+                        let tempPath = null
                         if(req.mainQuery.length === 64){
                             if(prog.has(req.mainQuery)){
                                 tempData = prog.get(req.mainQuery)
@@ -104,19 +105,16 @@ module.exports = function makeBTFetch(opts = {}){
                                 tempData = await app.loadAddress(req.mainQuery)
                                 prog.set(tempData.address, tempData)
                             }
+                            if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                tempPath = tempData.path + path.sep
+                            } else {
+                                tempPath = tempData.path + path.sep + tempData.name + path.sep
+                            }
                             if(req.mainPath === path.sep){
                                 if(req.mainReq){
-                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
-                                        res.data = [`<html><head><title>${tempData.address}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
-                                    } else {
-                                        res.data = [`<html><head><title>${tempData.address}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
-                                    }
+                                    res.data = [`<html><head><title>${tempData.address}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.address}/${file.path.replace(tempPath, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
                                 } else {
-                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
-                                        res.data = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.address + '/' + file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
-                                    } else {
-                                        res.data = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.address + '/' + file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
-                                    }
+                                    res.data = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.address + '/' + file.path.replace(tempPath, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
                                 }
                                 res.statusCode = 200
                                 res.headers['Content-Type'] = req.mainRes
@@ -157,19 +155,16 @@ module.exports = function makeBTFetch(opts = {}){
                                 tempData = await app.loadHash(req.mainQuery)
                                 prog.set(tempData.infoHash, tempData)
                             }
+                            if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
+                                tempPath = tempData.path + path.sep
+                            } else {
+                                tempPath = tempData.path + path.sep + tempData.name + path.sep
+                            }
                             if(req.mainPath === path.sep){
                                 if(req.mainReq){
-                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
-                                        res.data = [`<html><head><title>${tempData.infoHash}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
-                                    } else {
-                                        res.data = [`<html><head><title>${tempData.infoHash}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
-                                    }
+                                    res.data = [`<html><head><title>${tempData.infoHash}</title></head><body><div>${tempData.files.map(file => {return `<p><a href="bt://${tempData.infoHash}/${file.path.replace(tempPath, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}">${file.name}</a></p>`})}</div></body></html>`]
                                 } else {
-                                    if(tempData.files.length === 1 && tempData.name === tempData.files[0].name){
-                                        res.data = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.infoHash + '/' + file.path.replace(tempData.path + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
-                                    } else {
-                                        res.data = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.infoHash + '/' + file.path.replace(tempData.path + path.sep + tempData.name + path.sep, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
-                                    }
+                                    res.data = [JSON.stringify(tempData.files.map(file => {return 'bt://' + tempData.infoHash + '/' + file.path.replace(tempPath, '').split(path.sep).map(data => {return encodeURIComponent(data)}).join('/')}))]
                                 }
                                 res.statusCode = 200
                                 res.headers['Content-Type'] = req.mainRes
