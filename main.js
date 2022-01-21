@@ -381,6 +381,7 @@ class Main {
                     resolve(res)
                 }).catch(error => {
                     console.log(error)
+                    // if there is an error with publishing to the dht, then stop this torrent and reject the promise
                     this.webtorrent.remove(checkTorrent.infoHash, {destroyStore: false})
                     reject(error)
                 })
@@ -570,6 +571,7 @@ class Main {
                 this.publishFunc(keypair.address, keypair.secret, {ih: checkTorrent.infoHash}).then(res => {
                     resolve(res)
                 }).catch(error => {
+                    // if there is an error with publishing to the dht, then stop this torrent and reject the promise
                     this.webtorrent.remove(checkTorrent.infoHash, {destroyStore: false})
                     reject(error)
                 })
@@ -816,7 +818,8 @@ class Main {
         })
       }
     
-      saveData(data){
+      // keep the data we currently hold active by putting it back into the dht
+      keepData(data){
         return new Promise((resolve, reject) => {
           this.webtorrent.dht.put({k: Buffer.from(data.address, 'hex'), v: {ih: data.infoHash, ...data.stuff}, seq: data.sequence, sig: Buffer.from(data.sig, 'hex')}, (error, hash, number) => {
             if(error){
@@ -828,6 +831,7 @@ class Main {
         })
       }
     
+      // tries to get the data from another user and put that recent data back into the dht to keep the data active
       keepCurrent(address){
         return new Promise((resolve, reject) => {
           const buffAddKey = Buffer.from(address, 'hex')
@@ -853,12 +857,14 @@ class Main {
         })
       }
     
+      // create a keypair
       createKeypair () {
         let {publicKey, secretKey} = ed.createKeyPair(ed.createSeed())
     
         return { address: publicKey.toString('hex'), secret: secretKey.toString('hex') }
       }
     
+      // extract the public key/address out of a link
       addressFromLink(link){
         if(!link || typeof(link) !== 'string'){
           return ''
