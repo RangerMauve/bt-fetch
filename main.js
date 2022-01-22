@@ -88,6 +88,7 @@ async function startUp(self){
                         })
                     ])
                     if(checkProperty){
+                        // don't overwrite the torrent's infohash even though they will both be the same
                         delete checkProperty.infoHash
                         for(const prop in checkProperty){
                             checkTorrent[prop] = checkProperty[prop]
@@ -157,6 +158,7 @@ async function startUp(self){
                     if(checkTorrent){
                         checkTorrent.folder = folderPath
                         checkTorrent.side = false
+                        // don't overwrite the torrent's infohash even though they will both be the same
                         delete checkProperty.infoHash
                         for(const prop in checkProperty){
                             checkTorrent[prop] = checkProperty[prop]
@@ -388,6 +390,7 @@ class Main {
                 })
             })
         ])
+        // don't overwrite the torrent's infohash even though they will both be the same
         delete checkProperty.infoHash
         checkProperty.folder = folderPath
         checkProperty.side = true
@@ -517,6 +520,7 @@ class Main {
                 })
             })
         ])
+        // don't overwrite the torrent's infohash even though they will both be the same
         delete checkProperty.infoHash
         for(const prop in checkProperty){
             checkTorrent[prop] = checkProperty[prop]
@@ -581,6 +585,7 @@ class Main {
                 })
             })
         ])
+        // don't overwrite the torrent's infohash even though they will both be the same
         delete checkProperty.infoHash
         checkProperty.folder = folder.main
         checkProperty.side = true
