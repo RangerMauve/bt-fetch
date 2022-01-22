@@ -81,6 +81,7 @@ async function startUp(self){
                                 resolve(res)
                             }).catch(error => {
                                 console.log(error)
+                                // most likely the infohash of this torrent does not match what we have currently, stop this torrent
                                 self.webtorrent.remove(checkTorrent.infoHash, {destroyStore: false})
                                 resolve(null)
                             })
@@ -381,7 +382,7 @@ class Main {
                     resolve(res)
                 }).catch(error => {
                     console.log(error)
-                    // if there is an error with publishing to the dht, then stop this torrent and reject the promise
+                    // most likely the infohash of this torrent does not match what we have, stop this torrent and reject the promise
                     this.webtorrent.remove(checkTorrent.infoHash, {destroyStore: false})
                     reject(error)
                 })
