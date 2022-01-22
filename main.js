@@ -525,6 +525,9 @@ class Main {
     }
 
     // publish a new BEP46 torrent, or update an address/public key with a new torrent
+    // we need a folder(string) passed in as an argument
+    // we check we have a torrent already for the public key address
+    // we then copy the data from the folder to the this._internal directory
     // we return secret key along with the torrent because the user will need it
     async publishAddress(folder, keypair){
         if(!keypair || !keypair.address || !keypair.secret){
