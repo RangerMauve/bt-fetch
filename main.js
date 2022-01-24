@@ -108,9 +108,7 @@ async startUp () {
       const folderPath = path.join(this._internal, checkInternalPath)
       if (checkAddress.test(checkInternalPath)) {
         const checkTorrent = await Promise.any([
-          new Promise((resolve, reject) => {
-            setTimeout(() => { resolve(null) }, this._timeout)
-          }),
+          this.delayTimeOut(this._timeout, null, true),
           new Promise((resolve, reject) => {
             this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
               resolve(torrent)
@@ -120,7 +118,7 @@ async startUp () {
         if (checkTorrent) {
           checkTorrent.folder = folderPath
           const checkProperty = await Promise.any([
-            new Promise((resolve, reject) => { setTimeout(() => { resolve(null) }, this._timeout) }),
+            this.delayTimeOut(this._timeout, null, true),
             new Promise((resolve, reject) => {
               this.ownData(checkInternalPath, checkTorrent.infoHash).then(res => {
                 resolve(res)
@@ -145,9 +143,7 @@ async startUp () {
         }
       } else if (checkTitle.test(checkInternalPath)) {
         const checkTorrent = await Promise.any([
-          new Promise((resolve, reject) => {
-            setTimeout(() => { resolve(null) }, this._timeout)
-          }),
+          this.delayTimeOut(this._timeout, null, true),
           new Promise((resolve, reject) => {
             this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
               resolve(torrent)
@@ -173,7 +169,7 @@ async startUp () {
       const folderPath = path.join(this._external, checkExternalPath)
       if (checkAddress.test(checkExternalPath)) {
         const checkProperty = await Promise.any([
-          new Promise((resolve, reject) => { setTimeout(() => { resolve(null) }, this._timeout) }),
+          this.delayTimeOut(this._timeout, null, true),
           this.resolve(checkExternalPath)
         ])
         if (checkProperty) {
@@ -193,7 +189,7 @@ async startUp () {
             }
           }
           const checkTorrent = await Promise.any([
-            new Promise((resolve, reject) => { setTimeout(() => { resolve(null) }, this._timeout) }),
+            this.delayTimeOut(this._timeout, null, true),
             new Promise((resolve, reject) => {
               this.webtorrent.add(checkProperty.infoHash, { path: folderPath + path.sep + checkProperty.infoHash, destroyStoreOnDestroy: true }, torrent => {
                 resolve(torrent)
@@ -213,7 +209,7 @@ async startUp () {
         }
       } else if (checkHash.test(checkExternalPath)) {
         const checkTorrent = await Promise.any([
-          new Promise((resolve, reject) => { setTimeout(() => { resolve(null) }, this._timeout) }),
+          this.delayTimeOut(this._timeout, null, true),
           new Promise((resolve, reject) => {
             this.webtorrent.add(checkExternalPath, { path: folderPath, destroyStoreOnDestroy: true }, torrent => {
               resolve(torrent)
@@ -231,6 +227,23 @@ async startUp () {
       }
     }
   }
+}
+
+delayTimeOut(timeout, data, res){
+  return new Promise((resolve, reject) => {setTimeout(() => {if(res){resolve(data)} else {reject(data)}}, timeout)})
+  // if(res){
+  //   return new Promise((resolve, reject) => {
+  //     setTimeout(() => {
+  //       resolve(data)
+  //     }, timeout)
+  //   })
+  // } else {
+  //   return new Promise((resolve, reject) => {
+  //     setTimeout(() => {
+  //       reject(data)
+  //     }, timeout)
+  //   })
+  // }
 }
 
   // when we resume or seed a user created BEP46 torrent that has already been created before
@@ -349,9 +362,7 @@ async startUp () {
       throw new Error('folder does not exist')
     }
     checkTorrent = await Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => { reject(new Error(title + ' took too long, it timed out')) }, this._timeout)
-      }),
+      this.delayTimeOut(this._timeout, new Error(title + ' took too long, it timed out'), false),
       new Promise((resolve, reject) => {
         this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
           resolve(torrent)
@@ -375,9 +386,7 @@ async startUp () {
       throw new Error('folder does not exist')
     }
     const checkTorrent = await Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => { reject(new Error(address + ' took too long, it timed out')) }, this._timeout)
-      }),
+      this.delayTimeOut(this._timeout, new Error(address + ' took too long, it timed out'), false),
       new Promise((resolve, reject) => {
         this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
           resolve(torrent)
@@ -386,10 +395,10 @@ async startUp () {
     ])
     const checkProperty = await Promise.race([
       new Promise((resolve, reject) => {
-        setTimeout(() => {
+        this.delayTimeOut(this._timeout, new Error(address + ' property took too long, it timed out, please try again with only the keypair without the folder'), false).catch(error => {
           this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-          reject(new Error(address + ' property took too long, it timed out, please try again with only the keypair without the folder'))
-        }, this._timeout)
+          reject(error)
+        })
       }),
       new Promise((resolve, reject) => {
         this.ownData(address, checkTorrent.infoHash).then(res => {
@@ -426,9 +435,7 @@ async startUp () {
     //     console.log(error)
     // }
     checkTorrent = await Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => { reject(new Error(hash + ' took too long, it timed out')) }, this._timeout)
-      }),
+      this.delayTimeOut(this._timeout, new Error(hash + ' took too long, it timed out'), false),
       new Promise((resolve, reject) => {
         this.webtorrent.add(hash, { path: folderPath, destroyStoreOnDestroy: true }, torrent => {
           resolve(torrent)
@@ -470,9 +477,7 @@ async startUp () {
       await fs.copy(folder.oldFolder, folder.newFolder, { overwrite: true })
     }
     const checkTorrent = await Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => { reject(new Error('torrent took too long, it timed out')) }, this._timeout)
-      }),
+      this.delayTimeOut(this._timeout, new Error('torrent took too long, it timed out'), false),
       new Promise((resolve, reject) => {
         this.webtorrent.seed(folder.main, { destroyStoreOnDestroy: true }, torrent => {
           resolve(torrent)
@@ -492,9 +497,7 @@ async startUp () {
       return haveTorrent
     }
     const checkProperty = await Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => { reject(new Error(address + ' property took too long, it timed out')) }, this._timeout)
-      }),
+      this.delayTimeOut(this._timeout, new Error(address + ' property took too long, it timed out'), false),
       this.resolveFunc(address)
     ])
 
@@ -522,9 +525,7 @@ async startUp () {
     }
 
     const checkTorrent = await Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => { reject(new Error(checkProperty.address + ' took too long, it timed out')) }, this._timeout)
-      }),
+      this.delayTimeOut(this._timeout, new Error(checkProperty.address + ' took too long, it timed out'), false),
       new Promise((resolve, reject) => {
         this.webtorrent.add(checkProperty.infoHash, { path: checkProperty.folder + path.sep + checkProperty.infoHash, destroyStoreOnDestroy: true }, torrent => {
           resolve(torrent)
@@ -570,9 +571,7 @@ async startUp () {
       await fs.copy(folder.oldFolder, folder.newFolder, { overwrite: true })
     }
     const checkTorrent = await Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => { reject(new Error('torrent took too long, it timed out')) }, this._timeout)
-      }),
+      this.delayTimeOut(this._timeout, new Error('torrent took too long, it timed out'), false),
       new Promise((resolve, reject) => {
         this.webtorrent.seed(folder.main, { destroyStoreOnDestroy: true }, torrent => {
           resolve(torrent)
@@ -581,10 +580,10 @@ async startUp () {
     ])
     const checkProperty = await Promise.race([
       new Promise((resolve, reject) => {
-        setTimeout(() => {
+        this.delayTimeOut(this._timeout, new Error(keypair.address + ' property took too long, it timed out, please try again with only the keypair without the folder'), false).catch(error => {
           this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-          reject(new Error(keypair.address + ' property took too long, it timed out, please try again with only the keypair without the folder'))
-        }, this._timeout)
+          reject(error)
+        })
       }),
       new Promise((resolve, reject) => {
         this.publishFunc(keypair.address, keypair.secret, { ih: checkTorrent.infoHash }).then(res => {
