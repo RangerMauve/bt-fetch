@@ -7,8 +7,7 @@ const ed = require('ed25519-supercop')
 const bencode = require('bencode')
 const busboy = require('busboy')
 const { Readable } = require('stream')
-const EventIterator = require('event-iterator')
-const { fail } = require('assert')
+const {EventIterator} = require('event-iterator')
 // const EventEmitter = require('events').EventEmitter
 
 const BTPK_PREFIX = 'urn:btpk:'

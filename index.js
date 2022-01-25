@@ -204,7 +204,7 @@ module.exports = function makeBTFetch (opts = {}) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>'] : [JSON.stringify('body is required')]
               res.statusCode = 400
             } else if(req.mainUpdate === null){
-              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "update" is required</p></div></body></html>'] : [JSON.stringify('url param "kind" is required')]
+              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "update" is required</p></div></body></html>'] : [JSON.stringify('url param "update" is required')]
               res.statusCode = 400
             } else {
               if(req.mainUpdate === true){
