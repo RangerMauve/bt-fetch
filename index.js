@@ -52,9 +52,9 @@ module.exports = function makeBTFetch (opts = {}) {
     const mainMethod = method
     const mainReq = headers.accept && headers.accept.includes('text/html')
     const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-    const mainUpdate = search.get('update')
+    let mainUpdate = search.get('update')
     mainUpdate = mainUpdate ? JSON.parse(mainUpdate) : null
-    const mainRemove = search.get('remove')
+    let mainRemove = search.get('remove')
     mainRemove = mainRemove ? JSON.parse(mainRemove) : null
     const mainRange = headers.Range || headers.range
     return { mainQuery, mainHost, mainPath, mainMethod, mainReq, mainRes, mainType, mainUpdate, mainRemove, mainRange }
