@@ -730,13 +730,14 @@ delayTimeOut(timeout, data, res){
       })
     })
     await fs.ensureDir(folderPath)
+    async function handleFiles(name, file, info){
+      await fs.writeFile(path.join(folderPath, info.filename), file)
+      // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
+      // file.pipe(saveTo)
+    }
+    bb.on('file', handleFiles)
     await new Promise((resolve, reject) => {
-      function handleFiles(name, file, info){
-        fs.writeFile(path.join(folderPath, info.filename), file)
-        // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
-        // file.pipe(saveTo)
-      }
-      bb.on('file', handleFiles)
+      // bb.on('file', handleFiles)
       bb.once('error', (error) => {
         bb.off('file', handleFiles)
         reject(error)
