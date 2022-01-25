@@ -235,10 +235,17 @@ module.exports = function makeBTFetch (opts = {}) {
                 prog.delete(req.mainQuery)
               }
               if(req.mainQuery.length === 64){
-                const { torrent, secret } = await app.publishAddress({address: req.mainQuery, secret: reqHeaders['Authorization']}, reqHeaders, body)
-                prog.set(torrent.address, torrent)
-                res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
-                res.statusCode = 200
+                if(!reqHeaders['Authorization']){
+                  res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>secret key is required in the Authorizatiion header</p></div></body></html>'] : [JSON.stringify('secret key is needed inside the Authorization header')]
+                  res.statusCode = 400
+                } else {
+                  // const tempSecret = reqHeaders['Authorization']
+                  // delete reqHeaders['Authorization']
+                  const { torrent, secret } = await app.publishAddress({address: req.mainQuery, secret: reqHeaders['Authorization']}, reqHeaders, body)
+                  prog.set(torrent.address, torrent)
+                  res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
+                  res.statusCode = 200
+                }
               } else if(req.mainQuery.length === 40){
                 const { torrent, hash } = await app.publishHash(req.mainQuery, reqHeaders, body)
                 prog.set(torrent.hash, torrent)
