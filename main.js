@@ -7,7 +7,7 @@ const ed = require('ed25519-supercop')
 const bencode = require('bencode')
 const busboy = require('busboy')
 const { Readable } = require('stream')
-const {EventIterator} = require('event-iterator')
+// const {EventIterator} = require('event-iterator')
 // const EventEmitter = require('events').EventEmitter
 
 const BTPK_PREFIX = 'urn:btpk:'
@@ -464,7 +464,6 @@ delayTimeOut(timeout, data, res){
       hash = crypto.createHash('sha1').update(crypto.randomBytes(20).toString('hex')).digest('hex')
     }
     const folderPath = path.join(this._internal, hash)
-    await fs.ensureDir(folderPath)
     await this.handleFormData(folderPath, headers, data)
     const checkTorrent = await Promise.race([
       this.delayTimeOut(this._timeout, new Error('torrent took too long, it timed out'), false),
@@ -542,7 +541,6 @@ delayTimeOut(timeout, data, res){
       this.stopAddress(keypair.address)
     }
     const folderPath = path.join(this._internal, keypair.address)
-    await fs.ensureDir(folderPath)
     await this.handleFormData(folderPath, headers, data)
     const checkTorrent = await Promise.race([
       this.delayTimeOut(this._timeout, new Error('torrent took too long, it timed out'), false),
@@ -731,32 +729,23 @@ delayTimeOut(timeout, data, res){
         reject(error)
       })
     })
-    const toUpload = new EventIterator(({ push, stop, fail }) => {
+    await fs.ensureDir(folderPath)
+    await new Promise((resolve, reject) => {
       function handleFiles(name, file, info){
-        push(fs.writeFile(path.join(folderPath, info.filename), file))
+        fs.writeFile(path.join(folderPath, info.filename), file)
         // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
         // file.pipe(saveTo)
       }
       bb.on('file', handleFiles)
       bb.once('error', (error) => {
         bb.off('file', handleFiles)
-        fail(error)
+        reject(error)
       })
       bb.once('close', () => {
         bb.off('file', handleFiles)
-        stop()
+        resolve(null)
       })
     })
-    await Promise.all(await this.collect(toUpload))
-  }
-
-  async collect (iterable) {
-    const result = []
-    for await (const item of iterable) {
-      result.push(item)
-    }
-  
-    return result
   }
 
   // -------------- the below functions are BEP46 helpders, especially bothGetPut which keeps the data active in the dht ----------------
