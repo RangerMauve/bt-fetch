@@ -225,9 +225,6 @@ module.exports = function makeBTFetch (opts = {}) {
             res.headers['Content-Type'] = req.mainRes
           } else {
             if(!body){
-              if(prog.has(req.mainQuery)){
-                prog.delete(req.mainQuery)
-              }
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>'] : [JSON.stringify('body is required')]
               res.statusCode = 400
             } else if(!reqHeaders['Content-Type'] || !reqHeaders['Content-Type'].includes('multipart/form-data;')){
