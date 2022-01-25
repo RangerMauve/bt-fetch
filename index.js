@@ -7,7 +7,6 @@ const parseRange = require('range-parser')
 
 const checkHash = new RegExp('^[a-fA-F0-9]{40}$')
 const checkAddress = new RegExp('^[a-fA-F0-9]{64}$')
-const checkTitle = new RegExp('^[a-f0-9]{32}$')
 const DEFAULT_OPTS = {
   folder: __dirname,
   storage: 'storage',
@@ -53,20 +52,23 @@ module.exports = function makeBTFetch (opts = {}) {
     const mainMethod = method
     const mainReq = headers.accept && headers.accept.includes('text/html')
     const mainRes = mainReq ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-    const mainReg = !!search.get('clear')
+    const mainUpdate = search.get('update')
+    mainUpdate = mainUpdate ? JSON.parse(mainUpdate) : null
+    const mainRemove = search.get('remove')
+    mainRemove = mainRemove ? JSON.parse(mainRemove) : null
     const mainRange = headers.Range || headers.range
-    return { mainQuery, mainHost, mainPath, mainMethod, mainReg, mainReq, mainRes, mainType, mainRange }
+    return { mainQuery, mainHost, mainPath, mainMethod, mainReq, mainRes, mainType, mainUpdate, mainRemove, mainRange }
   }
 
   const fetch = makeFetch(async request => {
-    if (request.body !== null) {
-      request.body = await getBody(request.body)
-      try {
-        request.body = JSON.parse(request.body)
-      } catch (error) {
-        console.log(error)
-      }
-    }
+    // if (request.body !== null) {
+    //   request.body = await getBody(request.body)
+    //   try {
+    //     request.body = JSON.parse(request.body)
+    //   } catch (error) {
+    //     console.log(error)
+    //   }
+    // }
 
     const { url, method, headers: reqHeaders, body } = request
 
@@ -77,7 +79,7 @@ module.exports = function makeBTFetch (opts = {}) {
         return {statusCode: 409, headers: {}, data: ['wrong protocol']}
       } else if(!method || !SUPPORTED_METHODS.includes(method)){
         return {statusCode: 409, headers: {}, data: ['something wrong with method']}
-      } else if((!hostname) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && !checkTitle.test(hostname) && !checkHash.test(hostname) && !checkAddress.test(hostname))){
+      } else if((!hostname) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && !checkHash.test(hostname) && !checkAddress.test(hostname))){
         return {statusCode: 409, headers: {}, data: ['something wrong with hostname']}
       }
 
@@ -127,114 +129,69 @@ module.exports = function makeBTFetch (opts = {}) {
 
         case 'GET': {
           if (req.mainType) {
-            if (req.mainReq) {
-              res.data = ['Thank you for using BT-Fetch']
-            } else {
-              res.data = [JSON.stringify('Thank you for using BT-Fetch')]
-            }
+            res.data = req.mainReq ? ['Thank you for using BT-Fetch'] : [JSON.stringify('Thank you for using BT-Fetch')]
             res.statusCode = 200
             res.headers['Content-Type'] = req.mainRes
           } else {
             let torrentData = null
             let foundFile = null
             let tempPath = null
-            if (req.mainQuery.length === 64) {
-              if (prog.has(req.mainQuery)) {
-                torrentData = prog.get(req.mainQuery)
-              } else {
-                torrentData = await app.loadAddress(req.mainQuery)
+            if (prog.has(req.mainQuery)) {
+              torrentData = prog.get(req.mainQuery)
+            } else {
+              if (req.mainQuery.length === 64){
+                try {
+                  torrentData = await app.currentAddress(req.mainQuery)
+                } catch (error) {
+                  console.log(error)
+                }
+                if(!torrentData){
+                  torrentData = await app.loadAddress(req.mainQuery)
+                }
                 prog.set(torrentData.address, torrentData)
-              }
-              if (torrentData.files.length === 1 && torrentData.name === torrentData.files[0].name) {
-                tempPath = torrentData.path + path.sep
-              } else {
-                tempPath = torrentData.path + path.sep + torrentData.name + path.sep
-              }
-              if (req.mainPath === path.sep) {
-                if (req.mainReq) {
-                  res.data = [`<html><head><title>${torrentData.address}</title></head><body><div>${torrentData.files.map(file => { return `<p><a href="/${file.path.replace(tempPath, '').split(path.sep).map(data => { return encodeURIComponent(data) }).join('/')}">${file.name}</a></p>` })}</div></body></html>`]
-                } else {
-                  res.data = [JSON.stringify(torrentData.files.map(file => { return `/${file.path.replace(tempPath, '').split(path.sep).map(data => { return encodeURIComponent(data) }).join('/')}` }))]
+              } else if (req.mainQuery.length === 40){
+                try {
+                  torrentData = await app.currentHash(req.mainQuery)
+                } catch (error) {
+                  console.log(error)
                 }
-                res.statusCode = 200
-                res.headers['Content-Type'] = req.mainRes
-                res.headers['Content-Length'] = torrentData.length
-              } else {
-                foundFile = torrentData.files.find(file => { file.path.replace(tempPath, '') === req.mainPath })
-                if (foundFile) {
-                  if (req.mainRange) {
-                    const ranges = parseRange(foundFile.length, req.mainRange)
-                    if (ranges && ranges.length && ranges.type === 'bytes') {
-                      const [{ start, end }] = ranges
-                      const length = (end - start + 1)
+                if(!torrentData){
+                  torrentData = await app.loadHash(req.mainQuery)
+                }
+                prog.set(torrentData.hash, torrentData)
+              }
+            }
+            tempPath = torrentData.files.length === 1 && torrentData.name === torrentData.files[0].name ? torrentData.path + path.sep : torrentData.path + path.sep + torrentData.name + path.sep
+            if (req.mainPath === path.sep) {
+              res.data = req.mainReq ? [`<html><head><title>${torrentData.infoHash}</title></head><body><div>${torrentData.files.map(file => { return `<p><a href="/${file.path.replace(tempPath, '').split(path.sep).map(data => { return encodeURIComponent(data) }).join('/')}">${file.name}</a></p>` })}</div></body></html>`] : [JSON.stringify(torrentData.files.map(file => { return `/${file.path.replace(tempPath, '').split(path.sep).map(data => { return encodeURIComponent(data) }).join('/')}` }))]
+              res.statusCode = 200
+              res.headers['Content-Type'] = req.mainRes
+              res.headers['Content-Length'] = torrentData.length
+            } else {
+              foundFile = torrentData.files.find(file => { file.path.replace(tempPath, '') === req.mainPath })
+              if (foundFile) {
+                if (req.mainRange) {
+                  const ranges = parseRange(foundFile.length, req.mainRange)
+                  if (ranges && ranges.length && ranges.type === 'bytes') {
+                    const [{ start, end }] = ranges
+                    const length = (end - start + 1)
 
-                      res.data = streamToIterator(foundFile.createReadStream({start, end}))
-                      res.headers['Content-Length'] = `${length}`
-                      res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
-                    }
-                    res.statusCode = 206
-                    res.headers['Content-Type'] = getMimeType(req.mainPath)
-                  } else {
-                    res.data = streamToIterator(foundFile.createReadStream())
-                    res.headers['Content-Type'] = getMimeType(req.mainPath)
-                    res.headers['Content-Length'] = foundFile.length
-                    res.statusCode = 200
+                    res.data = streamToIterator(foundFile.createReadStream({start, end}))
+                    res.headers['Content-Length'] = `${length}`
+                    res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
                   }
+                  res.statusCode = 206
+                  res.headers['Content-Type'] = getMimeType(req.mainPath)
                 } else {
-                  res.data = [JSON.stringify('file was not found')]
-                  res.statusCode = 404
-                  res.headers['Content-Type'] = 'application/json; charset=utf-8'
+                  res.data = streamToIterator(foundFile.createReadStream())
+                  res.headers['Content-Type'] = getMimeType(req.mainPath)
+                  res.headers['Content-Length'] = foundFile.length
+                  res.statusCode = 200
                 }
-              }
-            } else if (req.mainQuery.length === 40) {
-              if (prog.has(req.mainQuery)) {
-                torrentData = prog.get(req.mainQuery)
               } else {
-                torrentData = await app.loadHash(req.mainQuery)
-                prog.set(torrentData.infoHash, torrentData)
-              }
-              if (torrentData.files.length === 1 && torrentData.name === torrentData.files[0].name) {
-                tempPath = torrentData.path + path.sep
-              } else {
-                tempPath = torrentData.path + path.sep + torrentData.name + path.sep
-              }
-              if (req.mainPath === path.sep) {
-                if (req.mainReq) {
-                  res.data = [`<html><head><title>${torrentData.infoHash}</title></head><body><div>${torrentData.files.map(file => { return `<p><a href="/${file.path.replace(tempPath, '').split(path.sep).map(data => { return encodeURIComponent(data) }).join('/')}">${file.name}</a></p>` })}</div></body></html>`]
-                } else {
-                  res.data = [JSON.stringify(torrentData.files.map(file => { return `/${file.path.replace(tempPath, '').split(path.sep).map(data => { return encodeURIComponent(data) }).join('/')}` }))]
-                }
-                res.statusCode = 200
-                res.headers['Content-Type'] = req.mainRes
-                res.headers['Content-Length'] = torrentData.length
-              } else {
-                foundFile = torrentData.files.find(file => { file.path.replace(tempPath, '') === req.mainPath })
-                if (foundFile) {
-                  if (req.mainRange) {
-                    const ranges = parseRange(foundFile.length, req.mainRange)
-                    if (ranges && ranges.length && ranges.type === 'bytes') {
-                      const [{ start, end }] = ranges
-                      const length = (end - start + 1)
-                      req.mainPartial.start = start
-                      req.mainPartial.end = end
-
-                      res.headers['Content-Length'] = `${length}`
-                      res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
-                    }
-                    res.statusCode = 206
-                    res.data = streamToIterator(foundFile.createReadStream(req.mainPartial))
-                    res.headers['Content-Type'] = getMimeType(req.mainPath)
-                  } else {
-                    res.data = streamToIterator(foundFile.createReadStream())
-                    res.headers['Content-Type'] = getMimeType(req.mainPath)
-                    res.headers['Content-Length'] = foundFile.length
-                    res.statusCode = 200
-                  }
-                } else {
-                  res.data = [JSON.stringify('file was not found')]
-                  res.statusCode = 404
-                  res.headers['Content-Type'] = 'application/json; charset=utf-8'
-                }
+                res.data = [JSON.stringify('file was not found')]
+                res.statusCode = 404
+                res.headers['Content-Type'] = 'application/json; charset=utf-8'
               }
             }
           }
@@ -244,82 +201,47 @@ module.exports = function makeBTFetch (opts = {}) {
         case 'POST': {
           if (req.mainType) {
             if (!body) {
-              if (req.mainReq) {
-                res.data = ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>']
-              } else {
-                res.data = [JSON.stringify('body is required')]
-              }
+              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>'] : [JSON.stringify('body is required')]
+              res.statusCode = 400
+            } else if(req.mainUpdate === null){
+              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "update" is required</p></div></body></html>'] : [JSON.stringify('url param "kind" is required')]
               res.statusCode = 400
             } else {
-              if (body.folder) {
-                if (body.address === undefined || body.secret === undefined) {
-                  const { torrent, title } = await app.publishTitle(body.folder)
-                  if (prog.has(torrent.infoHash)) {
-                    prog.delete(torrent.infoHash)
-                    prog.set(torrent.infoHash, torrent)
-                  } else {
-                    prog.set(torrent.infoHash, torrent)
-                  }
-                  if (req.mainReq) {
-                    res.data = [`<html><head><title>${torrent.title}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${title}</p></div></body></html>`]
-                  } else {
-                    res.data = [JSON.stringify({ infohash: torrent.infoHash, title })]
-                  }
-                  res.statusCode = 200
-                } else {
-                  const { torrent, secret } = await app.publishAddress(body.folder, { address: body.address, secret: body.secret })
-                  if (prog.has(torrent.address)) {
-                    prog.delete(torrent.address)
-                    prog.set(torrent.address, torrent)
-                  } else {
-                    prog.set(torrent.address, torrent)
-                  }
-                  if (req.mainReq) {
-                    res.data = [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`]
-                  } else {
-                    res.data = [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
-                  }
-                  res.statusCode = 200
-                }
-              } else {
-                if (req.mainReq) {
-                  res.data = ['<html><head><title>BT-Fetch</title></head><body><div><p>body is missing data</p></div></body></html>']
-                } else {
-                  res.data = [JSON.stringify('body is missing data')]
-                }
-                res.statusCode = 400
+              if(req.mainUpdate === true){
+                const { torrent, secret } = await app.publishAddress(null, reqHeaders, body)
+                prog.set(torrent.address, torrent)
+                res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
+                res.statusCode = 200
+              } else if(req.mainUpdate === false){
+                const { torrent, hash } = await app.publishHash(null, reqHeaders, body)
+                prog.set(torrent.hash, torrent)
+                res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.hash, hash })]
+                res.statusCode = 200
               }
             }
             res.headers['Content-Type'] = req.mainRes
           } else {
-            if (req.mainQuery.length === 64) {
-              const torrent = await app.currentAddress(req.mainQuery)
-              if (prog.has(torrent.address)) {
-                prog.delete(torrent.address)
+            if(!body){
+              if(prog.has(req.mainQuery)){
+                prog.delete(req.mainQuery)
+              }
+              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>'] : [JSON.stringify('body is required')]
+              res.statusCode = 400
+            } else {
+              if(prog.has(req.mainQuery)){
+                prog.delete(req.mainQuery)
+              }
+              if(req.mainQuery.length === 64){
+                const { torrent, secret } = await app.publishAddress({address: req.mainQuery, secret: reqHeaders['Authorization']}, reqHeaders, body)
                 prog.set(torrent.address, torrent)
-              } else {
-                prog.set(torrent.address, torrent)
+                res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
+                res.statusCode = 200
+              } else if(req.mainQuery.length === 40){
+                const { torrent, hash } = await app.publishHash(req.mainQuery, reqHeaders, body)
+                prog.set(torrent.hash, torrent)
+                res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.hash, hash })]
+                res.statusCode = 200
               }
-              if (req.mainReq) {
-                res.data = [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
-              } else {
-                res.data = [JSON.stringify({ address: torrent.address, infoHash: torrent.infoHash })]
-              }
-              res.statusCode = 200
-            } else if (req.mainQuery.length === 32) {
-              const torrent = await app.currentTitle(req.mainQuery)
-              if (prog.has(torrent.infoHash)) {
-                prog.delete(torrent.infoHash)
-                prog.set(torrent.infoHash, torrent)
-              } else {
-                prog.set(torrent.infoHash, torrent)
-              }
-              if (req.mainReq) {
-                res.data = [`<html><head><title>${torrent.title}</title></head><body><div><p>title: ${torrent.title}</p><p>infohash: ${torrent.infoHash}</p></div></body></html>`]
-              } else {
-                res.data = [JSON.stringify({ title: torrent.title, infoHash: torrent.infoHash })]
-              }
-              res.statusCode = 200
             }
             res.headers['Content-Type'] = req.mainRes
           }
@@ -330,80 +252,30 @@ module.exports = function makeBTFetch (opts = {}) {
           if (req.mainType) {
             if (!body) {
               prog.clear()
-              if (req.mainReq) {
-                res.data = [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.clearData()}</p></div></body></html>`]
-              } else {
-                res.data = [JSON.stringify(app.clearData())]
-              }
+              res.data = req.mainReq ? [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.clearData()}</p></div></body></html>`] : [JSON.stringify(app.clearData())]
               res.statusCode = 400
               // mainData = [await app.clearData()]
               // prog.clear()
-            } else if (body.hash) {
-              if (prog.has(body.hash)) {
-                prog.delete(body.hash)
-              }
-              if (req.mainReq) {
-                res.data = [`<html><head><title>${body.hash}</title></head><body><div><p>${await app.removeHash(body.hash)}</p></div></body></html>`]
-              } else {
-                res.data = [JSON.stringify(await app.removeHash(body.hash))]
-              }
-              res.statusCode = 200
-            } else if (body.address) {
-              if (prog.has(body.address)) {
-                prog.delete(body.address)
-              }
-              if (req.mainReq) {
-                res.data = [`<html><head><title>${body.address}</title></head><body><div><p>${await app.removeAddress(body.address)}</p></div></body></html>`]
-              } else {
-                res.data = [JSON.stringify(await app.removeAddress(body.address))]
-              }
-              res.statusCode = 200
-            } else if (body.title) {
-              if (prog.has(body.title)) {
-                prog.delete(body.title)
-              }
-              if (req.mainReq) {
-                res.data = [`<html><head><title>${body.title}</title></head><body><div><p>${await app.removeTitle(body.title)}</p></div></body></html>`]
-              } else {
-                res.data = [JSON.stringify(await app.removeTitle(body.title))]
-              }
-              res.statusCode = 200
             } else {
-              res.data = [JSON.stringify('body is missing data')]
+              res.data = req.mainReq ? [`<html><head><title>BT-Fetch</title></head><body><div><p>body must be empty</p></div></body></html>`] : [JSON.stringify('body must be empty')]
               res.statusCode = 400
             }
             res.headers['Content-Type'] = req.mainRes
           } else {
-            if (req.mainQuery.length === 64) {
-              if (prog.has(req.mainQuery)) {
+            if(req.mainRemove === null){
+              res.data = req.mainReq ? [`<html><head><title>BT-Fetch</title></head><body><div><p>url param "remove" is required</p></div></body></html>`] : [JSON.stringify('url param "remove" is required')]
+              res.statusCode = 400
+            } else {
+              if(prog.has(req.mainQuery)) {
                 prog.delete(req.mainQuery)
               }
-              if (req.mainReq) {
-                res.data = [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${app.stopAddress(req.mainQuery)}</p></div></body></html>`]
-              } else {
-                res.data = [JSON.stringify(app.stopAddress(req.mainQuery))]
+              if (req.mainQuery.length === 64) {
+                res.data = req.mainReq ? [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${req.mainRemove ? await app.removeAddress(req.mainQuery) : app.stopAddress(req.mainQuery)}</p></div></body></html>`] : [JSON.stringify(req.mainRemove ? await app.removeAddress(req.mainQuery) : app.stopAddress(req.mainQuery))]
+                res.statusCode = 200
+              } else if (req.mainQuery.length === 40) {
+                res.data = req.mainReq ? [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${req.mainRemove ? await app.removeHash(req.mainQuery) : app.stopHash(req.mainQuery)}</p></div></body></html>`] : [JSON.stringify(req.mainRemove ? await app.removeHash(req.mainQuery) : app.stopHash(req.mainQuery))]
+                res.statusCode = 200
               }
-              res.statusCode = 200
-            } else if (req.mainQuery.length === 40) {
-              if (prog.has(req.mainQuery)) {
-                prog.delete(req.mainQuery)
-              }
-              if (req.mainReq) {
-                mainData = [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${app.stopHash(req.mainQuery)}</p></div></body></html>`]
-              } else {
-                mainData = [JSON.stringify(app.stopHash(req.mainQuery))]
-              }
-              res.statusCode = 200
-            } else if (req.mainQuery.length === 32) {
-              if (prog.has(req.mainQuery)) {
-                prog.delete(req.mainQuery)
-              }
-              if (req.mainReq) {
-                mainData = [`<html><head><title>${req.mainQuery}</title></head><body><div><p>${app.stopTitle(req.mainQuery)}</p></div></body></html>`]
-              } else {
-                mainData = [JSON.stringify(app.stopTitle(req.mainQuery))]
-              }
-              res.statusCode = 200
             }
             res.headers['Content-Type'] = req.mainRes
           }
