@@ -729,24 +729,36 @@ delayTimeOut(timeout, data, res){
         reject(error)
       })
     })
+    
     await fs.ensureDir(folderPath)
-    async function handleFiles(name, file, info){
-      await fs.writeFile(path.join(folderPath, info.filename), file)
-      // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
-      // file.pipe(saveTo)
-    }
-    bb.on('file', handleFiles)
+    let writtenData = []
+    
     await new Promise((resolve, reject) => {
-      // bb.on('file', handleFiles)
-      bb.once('error', (error) => {
+      function handleFiles(name, file, info){
+        writtenData.push(fs.writeFile(path.join(folderPath, info.filename), file))
+        // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
+        // file.pipe(saveTo)
+      }
+      function handleRemoval(){
         bb.off('file', handleFiles)
+        bb.off('error', handleErrors)
+        bb.off('close', handleClose)
+      }
+      function handleErrors(error){
+        handleRemoval()
         reject(error)
-      })
-      bb.once('close', () => {
-        bb.off('file', handleFiles)
+      }
+      function handleClose(){
+        handleRemoval()
         resolve(null)
-      })
+      }
+      bb.on('file', handleFiles)
+      bb.on('error', handleErrors)
+      bb.on('close', handleClose)
     })
+
+    await Promise.all(writtenData)
+    writtenData = null
   }
 
   // -------------- the below functions are BEP46 helpders, especially bothGetPut which keeps the data active in the dht ----------------
