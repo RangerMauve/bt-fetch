@@ -7,7 +7,7 @@ const ed = require('ed25519-supercop')
 const bencode = require('bencode')
 const busboy = require('busboy')
 const { Readable } = require('stream')
-// const {EventIterator} = require('event-iterator')
+const {EventIterator} = require('event-iterator')
 // const EventEmitter = require('events').EventEmitter
 
 const BTPK_PREFIX = 'urn:btpk:'
@@ -720,45 +720,46 @@ delayTimeOut(timeout, data, res){
 
   async handleFormData(folderPath, headers, data){
     const bb = busboy({ headers })
-    await new Promise((resolve, reject) => {
-      let tempStream = Readable.from(data).pipe(bb)
-      tempStream.once('close', () => {
-        resolve(null)
-      })
-      tempStream.once('error', (error) => {
-        reject(error)
-      })
-    })
-    
     await fs.ensureDir(folderPath)
-    let writtenData = []
     
-    await new Promise((resolve, reject) => {
-      function handleFiles(name, file, info){
-        writtenData.push(fs.writeFile(path.join(folderPath, info.filename), file))
-        // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
-        // file.pipe(saveTo)
-      }
+    const toUpload = new EventIterator(({ push, stop, fail }) => {
       function handleRemoval(){
         bb.off('file', handleFiles)
         bb.off('error', handleErrors)
         bb.off('close', handleClose)
       }
+      function handleFiles(name, file, info){
+        push(fs.writeFile(path.join(folderPath, info.filename), file))
+        // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
+        // file.pipe(saveTo)
+      }
       function handleErrors(error){
         handleRemoval()
-        reject(error)
+        fail(error)
       }
       function handleClose(){
         handleRemoval()
-        resolve(null)
+        stop()
       }
-      bb.on('file', handleFiles)
-      bb.on('error', handleErrors)
-      bb.on('close', handleClose)
+      busboy.on('error', handleErrors)
+      busboy.on('close', handleClose)
+      busboy.on('file', handleFiles)
+
+      // TODO: Does busboy need to be GC'd?
+      return () => {}
     })
 
-    await Promise.all(writtenData)
-    writtenData = null
+    Readable.from(data).pipe(bb)
+    await Promise.all(await this.collect(toUpload))
+  }
+
+  async collect(iterable) {
+    const result = []
+    for await (const item of iterable) {
+      result.push(item)
+    }
+  
+    return result
   }
 
   // -------------- the below functions are BEP46 helpders, especially bothGetPut which keeps the data active in the dht ----------------
