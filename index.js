@@ -206,7 +206,7 @@ module.exports = function makeBTFetch (opts = {}) {
             } else if(req.mainUpdate === null){
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "update" is required</p></div></body></html>'] : [JSON.stringify('url param "update" is required')]
               res.statusCode = 400
-            } else if(!reqHeaders['Content-Type'] || !reqHeaders['Content-Type'].includes('multipart/form-data')){
+            } else if(!reqHeaders['content-type'] || !reqHeaders['content-type'].includes('multipart/form-data')){
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>Content-Type header is invalud</p></div></body></html>'] : [JSON.stringify('Content-Type header is invalid')]
               res.statusCode = 400
             } else {
