@@ -719,8 +719,8 @@ delayTimeOut(timeout, data, res){
   }
 
   async handleFormData(folderPath, headers, data){
-    const bb = busboy({ headers })
     await fs.ensureDir(folderPath)
+    const bb = busboy({ headers })
     
     const toUpload = new EventIterator(({ push, stop, fail }) => {
       function handleRemoval(){
