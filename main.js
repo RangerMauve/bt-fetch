@@ -7,7 +7,7 @@ const ed = require('ed25519-supercop')
 const bencode = require('bencode')
 const busboy = require('busboy')
 const { Readable } = require('stream')
-const {EventIterator} = require('event-iterator')
+// const {EventIterator} = require('event-iterator')
 // const EventEmitter = require('events').EventEmitter
 
 const BTPK_PREFIX = 'urn:btpk:'
@@ -464,7 +464,13 @@ delayTimeOut(timeout, data, res){
       hash = crypto.createHash('sha1').update(crypto.randomBytes(20).toString('hex')).digest('hex')
     }
     const folderPath = path.join(this._internal, hash)
+    await fs.ensureDir(folderPath)
     await this.handleFormData(folderPath, headers, data)
+    const checkFolderPath = await fs.readdir(folderPath, {withFileTypes: false})
+    if(!checkFolderPath.length){
+      await fs.remove(folderPath)
+      throw new Error('data could not be written to new torrent')
+    }
     const checkTorrent = await Promise.race([
       this.delayTimeOut(this._timeout, new Error('torrent took too long, it timed out'), false),
       new Promise((resolve, reject) => {
@@ -541,7 +547,13 @@ delayTimeOut(timeout, data, res){
       this.stopAddress(keypair.address)
     }
     const folderPath = path.join(this._internal, keypair.address)
+    await fs.ensureDir(folderPath)
     await this.handleFormData(folderPath, headers, data)
+    const checkFolderPath = await fs.readdir(folderPath, {withFileTypes: false})
+    if(!checkFolderPath.length){
+      await fs.remove(folderPath)
+      throw new Error('data could not be written to new torrent')
+    }
     const checkTorrent = await Promise.race([
       this.delayTimeOut(this._timeout, new Error('torrent took too long, it timed out'), false),
       new Promise((resolve, reject) => {
@@ -718,48 +730,33 @@ delayTimeOut(timeout, data, res){
     return tempTorrent
   }
 
-  async handleFormData(folderPath, headers, data){
-    await fs.ensureDir(folderPath)
+  handleFormData(folderPath, headers, data){
     const bb = busboy({ headers })
     
-    const toUpload = new EventIterator(({ push, stop, fail }) => {
+    return new Promise((resolve, reject) => {
       function handleRemoval(){
         bb.off('file', handleFiles)
         bb.off('error', handleErrors)
         bb.off('close', handleClose)
       }
       function handleFiles(name, file, info){
-        push(fs.writeFile(path.join(folderPath, info.filename), file))
+        // fs.writeFile(path.join(folderPath, info.filename), Readable.from(file))
         // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
-        // file.pipe(saveTo)
+        file.pipe(fs.createWriteStream(path.join(folderPath, info.filename)))
       }
       function handleErrors(error){
         handleRemoval()
-        fail(error)
+        reject(error)
       }
       function handleClose(){
         handleRemoval()
-        stop()
+        resolve(null)
       }
+      bb.on('file', handleFiles)
       bb.on('error', handleErrors)
       bb.on('close', handleClose)
-      bb.on('file', handleFiles)
-
-      // TODO: Does busboy need to be GC'd?
-      return () => {}
+      Readable.from(data).pipe(bb)
     })
-
-    Readable.from(data).pipe(bb)
-    await Promise.all(await this.collect(toUpload))
-  }
-
-  async collect(iterable) {
-    const result = []
-    for await (const item of iterable) {
-      result.push(item)
-    }
-  
-    return result
   }
 
   // -------------- the below functions are BEP46 helpders, especially bothGetPut which keeps the data active in the dht ----------------
