@@ -203,24 +203,22 @@ module.exports = function makeBTFetch (opts = {}) {
             if (!body) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>'] : [JSON.stringify('body is required')]
               res.statusCode = 400
-            } else if(req.mainUpdate === null){
-              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "update" is required</p></div></body></html>'] : [JSON.stringify('url param "update" is required')]
-              res.statusCode = 400
             } else if(!reqHeaders['content-type'] || !reqHeaders['content-type'].includes('multipart/form-data')){
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>Content-Type header is invalud</p></div></body></html>'] : [JSON.stringify('Content-Type header is invalid')]
               res.statusCode = 400
-            } else {
-              if(req.mainUpdate === true){
+            } else if(req.mainUpdate === null){
+              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "update" is required</p></div></body></html>'] : [JSON.stringify('url param "update" is required')]
+              res.statusCode = 400
+            } else if(req.mainUpdate === true){
                 const { torrent, secret } = await app.publishAddress(null, reqHeaders, body)
                 prog.set(torrent.address, torrent)
                 res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
                 res.statusCode = 200
-              } else if(req.mainUpdate === false){
+            } else if(req.mainUpdate === false){
                 const { torrent, hash } = await app.publishHash(null, reqHeaders, body)
                 prog.set(torrent.hash, torrent)
                 res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.hash, hash })]
                 res.statusCode = 200
-              }
             }
             res.headers['Content-Type'] = req.mainRes
           } else {
@@ -231,22 +229,23 @@ module.exports = function makeBTFetch (opts = {}) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>Content-Type header is invalud</p></div></body></html>'] : [JSON.stringify('Content-Type header is invalid')]
               res.statusCode = 400
             } else {
-              if(prog.has(req.mainQuery)){
-                prog.delete(req.mainQuery)
-              }
               if(req.mainQuery.length === 64){
-                if(!reqHeaders['Authorization']){
+                if(!reqHeaders['authorization']){
                   res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>secret key is required in the Authorizatiion header</p></div></body></html>'] : [JSON.stringify('secret key is needed inside the Authorization header')]
                   res.statusCode = 400
                 } else {
-                  // const tempSecret = reqHeaders['Authorization']
-                  // delete reqHeaders['Authorization']
-                  const { torrent, secret } = await app.publishAddress({address: req.mainQuery, secret: reqHeaders['Authorization']}, reqHeaders, body)
+                  if(prog.has(req.mainQuery)){
+                    prog.delete(req.mainQuery)
+                  }
+                  const { torrent, secret } = await app.publishAddress({address: req.mainQuery, secret: reqHeaders['authorization']}, reqHeaders, body)
                   prog.set(torrent.address, torrent)
                   res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
                   res.statusCode = 200
                 }
               } else if(req.mainQuery.length === 40){
+                if(prog.has(req.mainQuery)){
+                  prog.delete(req.mainQuery)
+                }
                 const { torrent, hash } = await app.publishHash(req.mainQuery, reqHeaders, body)
                 prog.set(torrent.hash, torrent)
                 res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.hash, hash })]
@@ -260,14 +259,11 @@ module.exports = function makeBTFetch (opts = {}) {
 
         case 'DELETE': {
           if (req.mainType) {
-            if (!body) {
-              prog.clear()
-              res.data = req.mainReq ? [`<html><head><title>BT-Fetch</title></head><body><div><p>${app.clearData()}</p></div></body></html>`] : [JSON.stringify(app.clearData())]
+            if(req.mainQuery){
+              res.data = req.mainReq ? ['can not have underscore'] : [JSON.stringify('can not have underscore')]
               res.statusCode = 400
-              // mainData = [await app.clearData()]
-              // prog.clear()
             } else {
-              res.data = req.mainReq ? [`<html><head><title>BT-Fetch</title></head><body><div><p>body must be empty</p></div></body></html>`] : [JSON.stringify('body must be empty')]
+              res.data = req.mainReq ? ['must have hash or address'] : [JSON.stringify('must have hash or address')]
               res.statusCode = 400
             }
             res.headers['Content-Type'] = req.mainRes
