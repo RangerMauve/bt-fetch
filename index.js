@@ -107,7 +107,7 @@ module.exports = function makeBTFetch (opts = {}) {
                 } else {
                   tempPath = torrentData.path + path.sep + torrentData.name + path.sep
                 }
-                const foundFile = torrentData.files.find(file => { file.path.replace(tempPath, '') === req.mainPath })
+                const foundFile = torrentData.files.find(file => { return path.sep + file.path.replace(tempPath, '') === req.mainPath })
                 if (foundFile) {
                   res.headers['Content-Type'] = getMimeType(req.mainPath)
                   res.headers['Content-Length'] = `${foundFile.length}`
@@ -168,7 +168,7 @@ module.exports = function makeBTFetch (opts = {}) {
               res.headers['Content-Type'] = req.mainRes
               res.headers['Content-Length'] = torrentData.length
             } else {
-              foundFile = torrentData.files.find(file => { file.path.replace(tempPath, '') === req.mainPath })
+              foundFile = torrentData.files.find(file => { return path.sep + file.path.replace(tempPath, '') === req.mainPath })
               if (foundFile) {
                 if (req.mainRange) {
                   const ranges = parseRange(foundFile.length, req.mainRange)
