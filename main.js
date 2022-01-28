@@ -355,10 +355,10 @@ delayTimeOut(timeout, data, res){
 
   // we use this function to seed a non-BEP46 torrent that we have already created before, not really needed but here just for consistency
   async currentHash (hash) {
-    // const haveTorrent = this.findTheHash(hash)
-    // if (haveTorrent) {
-    //   return haveTorrent
-    // }
+    const haveTorrent = this.findTheHash(hash)
+    if (haveTorrent) {
+      return haveTorrent
+    }
     const folderPath = path.join(this._internal, hash)
     if (!await fs.pathExists(folderPath)) {
       throw new Error('folder does not exist')
@@ -379,10 +379,10 @@ delayTimeOut(timeout, data, res){
 
   // we must use this function to seed a BEP46 torrent that we have already published before
   async currentAddress (address) {
-    // const haveTorrent = this.findTheAddress(address)
-    // if (haveTorrent) {
-    //   return haveTorrent
-    // }
+    const haveTorrent = this.findTheAddress(address)
+    if (haveTorrent) {
+      return haveTorrent
+    }
     const folderPath = path.join(this._internal, address)
     if (!await fs.pathExists(folderPath)) {
       throw new Error('folder does not exist')
@@ -425,10 +425,10 @@ delayTimeOut(timeout, data, res){
 
   // download a regular non-BEP46 non-user created torrent by entering a 40 character infohash
   async loadHash (hash) {
-    // const haveTorrent = this.findTheHash(hash)
-    // if (haveTorrent) {
-    //   return haveTorrent
-    // }
+    const haveTorrent = this.findTheHash(hash)
+    if (haveTorrent) {
+      return haveTorrent
+    }
     // if user had torrent before, then empty the folder so previous data does not conflict with the infohash
     const folderPath = path.join(this._external, hash)
     const checkTorrent = await Promise.race([
@@ -482,10 +482,10 @@ delayTimeOut(timeout, data, res){
 
   // download a non-user created BEP46 torrent by their public key address, non-user meaning someone else's BEP46 torrent
   async loadAddress (address) {
-    // const haveTorrent = this.findTheAddress(address)
-    // if (haveTorrent) {
-    //   return haveTorrent
-    // }
+    const haveTorrent = this.findTheAddress(address)
+    if (haveTorrent) {
+      return haveTorrent
+    }
     const checkProperty = await Promise.race([
       this.delayTimeOut(this._timeout, new Error(address + ' property took too long, it timed out'), false),
       this.resolveFunc(address)
