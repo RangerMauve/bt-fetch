@@ -736,8 +736,8 @@ delayTimeOut(timeout, data, res){
       }
       function handleFiles(name, file, info){
         // fs.writeFile(path.join(folderPath, info.filename), Readable.from(file))
-        // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename));
-        file.pipe(fs.createWriteStream(path.join(folderPath, info.filename)))
+        const saveTo = fs.createWriteStream(path.join(folderPath, info.filename))
+        file.pipe(saveTo)
       }
       function handleErrors(error){
         handleRemoval()
