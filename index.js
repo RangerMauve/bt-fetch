@@ -217,7 +217,7 @@ module.exports = function makeBTFetch (opts = {}) {
             } else if(req.mainUpdate === false){
                 const { torrent, hash } = await app.publishHash(null, reqHeaders, body)
                 prog.set(torrent.hash, torrent)
-                res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.hash, hash })]
+                res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.infoHash, hash })]
                 res.statusCode = 200
             }
             res.headers['Content-Type'] = req.mainRes
