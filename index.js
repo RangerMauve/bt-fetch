@@ -115,7 +115,7 @@ module.exports = function makeBTFetch (opts = {}) {
                   res.headers['X-Downloaded'] = `${foundFile.downloaded}`
                   res.statusCode = 200
                 } else {
-                  res.statusCode = 400
+                  res.statusCode = 404
                   res.headers['Content-Length'] = 0
                 }
               }

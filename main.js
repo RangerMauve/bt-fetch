@@ -740,24 +740,24 @@ delayTimeOut(timeout, data, res){
       function handleRemoval(){
         bb.off('file', handleFiles)
         bb.off('error', handleErrors)
-        bb.off('close', handleClose)
+        bb.off('close', handleFinish)
       }
       function handleFiles(name, file, info){
         // fs.writeFile(path.join(folderPath, info.filename), Readable.from(file))
         // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename))
-        file.pipe(fs.createWriteStream(path.join(folderPath, info.filename)))
+        Readable.from(file).pipe(fs.createWriteStream(path.join(folderPath, info.filename)))
       }
       function handleErrors(error){
         handleRemoval()
         reject(error)
       }
-      function handleClose(){
+      function handleFinish(){
         handleRemoval()
         resolve(null)
       }
       bb.on('file', handleFiles)
       bb.on('error', handleErrors)
-      bb.on('close', handleClose)
+      bb.on('finish', handleFinish)
       Readable.from(data).pipe(bb)
     })
   }
