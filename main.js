@@ -460,6 +460,10 @@ delayTimeOut(timeout, data, res){
     }
     const folderPath = path.join(this._internal, hash)
     await fs.ensureDir(folderPath)
+    // await Promise.race([
+    //   this.delayTimeOut(this._timeout, new Error('took too long to write to disk'), false),
+    //   this.handleFormData(folderPath, headers, data)
+    // ])
     await this.handleFormData(folderPath, headers, data)
     const checkFolderPath = await fs.readdir(folderPath, {withFileTypes: false})
     if(!checkFolderPath.length){
@@ -543,6 +547,10 @@ delayTimeOut(timeout, data, res){
     }
     const folderPath = path.join(this._internal, keypair.address)
     await fs.ensureDir(folderPath)
+    // await Promise.race([
+    //   this.delayTimeOut(this._timeout, new Error('took too long to write to disk'), false),
+    //   this.handleFormData(folderPath, headers, data)
+    // ])
     await this.handleFormData(folderPath, headers, data)
     const checkFolderPath = await fs.readdir(folderPath, {withFileTypes: false})
     if(!checkFolderPath.length){
