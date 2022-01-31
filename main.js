@@ -456,7 +456,7 @@ delayTimeOut(timeout, data, res){
     if(hash){
       this.stopHash(hash)
     } else {
-      hash = crypto.createHash('sha1').update(crypto.randomBytes(20).toString('hex')).digest('hex')
+      hash = crypto.randomBytes(20).toString('hex')
     }
     const folderPath = path.join(this._internal, hash)
     await fs.ensureDir(folderPath)
@@ -603,6 +603,42 @@ delayTimeOut(timeout, data, res){
   // }
 
   // stops the torrent with the 40 character infohash(string)
+  shredHash (hash) {
+    const checkTorrent = this.findTheHash(hash)
+    if (checkTorrent) {
+      this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: true })
+      return true
+    } else {
+      return false
+    }
+  }
+
+  shredAddress (address) {
+    const checkTorrent = this.findTheAddress(address)
+    if (checkTorrent) {
+      this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: true })
+      return true
+    } else {
+      return false
+    }
+    // let result = null
+    // const checkTorrent = this.findTheAddress(address)
+    // if (checkTorrent) {
+    //   this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: true })
+    //   result = true
+    // } else {
+    //   if(await fs.pathExists(path.join(this._external, address))){
+    //     await fs.remove(path.join(this._external, address))
+    //     result = true
+    //   }
+    //   if(await fs.pathExists(path.join(this._internal, address))){
+    //     await fs.remove(path.join(this._internal, address))
+    //     result = true
+    //   }
+    // }
+    // return result
+  }
+
   stopHash (hash) {
     const checkTorrent = this.findTheHash(hash)
     if (checkTorrent) {
@@ -692,14 +728,15 @@ delayTimeOut(timeout, data, res){
           console.log(error)
         }
       }
-      if (await fs.pathExists(this._author + path.sep + address)) {
-        await fs.remove(this._author + path.sep + address)
-      }
+      // if (await fs.pathExists(this._author + path.sep + address)) {
+      //   await fs.remove(this._author + path.sep + address)
+      // }
     }
     return address + ' was removed'
   }
 
   // --------------------- the below functions loops and gets the torrents we are seeking, if it is not found then null is returned
+
   findTheFolder (folder) {
     let tempTorrent = null
     for (let i = 0; i < this.webtorrent.torrents.length; i++) {
