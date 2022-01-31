@@ -759,7 +759,7 @@ delayTimeOut(timeout, data, res){
       function handleRemoval(){
         bb.off('file', handleFiles)
         bb.off('error', handleErrors)
-        bb.off('close', handleFinish)
+        bb.off('finish', handleFinish)
       }
       function handleFiles(name, file, info){
         // fs.writeFile(path.join(folderPath, info.filename), Readable.from(file))
