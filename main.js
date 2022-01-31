@@ -139,7 +139,6 @@ async startUp () {
               checkTorrent[prop] = checkProperty[prop]
             }
             checkTorrent.folder = folderPath
-            checkTorrent.side = true
             console.log(checkInternalPath + ' is good')
           }
         }
@@ -155,7 +154,6 @@ async startUp () {
         if (checkTorrent) {
           checkTorrent.folder = folderPath
           checkTorrent.hash = checkInternalPath
-          checkTorrent.side = true
           console.log(checkInternalPath + ' is good')
         }
       } else {
@@ -200,7 +198,6 @@ async startUp () {
           ])
           if (checkTorrent) {
             checkTorrent.folder = folderPath
-            checkTorrent.side = false
             // don't overwrite the torrent's infohash even though they will both be the same
             delete checkProperty.infoHash
             for (const prop in checkProperty) {
@@ -220,7 +217,6 @@ async startUp () {
         ])
         if (checkTorrent) {
           checkTorrent.folder = folderPath
-          checkTorrent.side = false
           checkTorrent.hash = checkExternalPath
           console.log(checkExternalPath + ' is good')
         }
@@ -296,7 +292,7 @@ delayTimeOut(timeout, data, res){
       getData.v[prop] = getData.v[prop].toString('utf-8')
     }
     const { ih, ...stuff } = getData.v
-    return { magnet: `magnet:?xs=${BTPK_PREFIX}${address}`, address, infoHash: ih, sequence: getData.seq, stuff, sig: getData.sig.toString('hex'), side: false, from: getData.id.toString('hex') }
+    return { magnet: `magnet:?xs=${BTPK_PREFIX}${address}`, address, infoHash: ih, sequence: getData.seq, stuff, sig: getData.sig.toString('hex'), from: getData.id.toString('hex') }
   }
 
   // publish an infohash under a public key address in the dht
@@ -339,7 +335,7 @@ delayTimeOut(timeout, data, res){
       })
     })
     const { ih, ...stuff } = text
-    main = { magnet: `magnet:?xs=${BTPK_PREFIX}${address}`, address, infoHash: ih, sequence: seq, stuff, sig: buffSig.toString('hex'), side: true, ...putData }
+    main = { magnet: `magnet:?xs=${BTPK_PREFIX}${address}`, address, infoHash: ih, sequence: seq, stuff, sig: buffSig.toString('hex'), ...putData }
     await fs.writeFile(this._author + path.sep + address, JSON.stringify(main))
     return main
   }
@@ -373,7 +369,6 @@ delayTimeOut(timeout, data, res){
     ])
     checkTorrent.folder = folderPath
     checkTorrent.hash = hash
-    checkTorrent.side = true
     return checkTorrent
   }
 
@@ -416,7 +411,6 @@ delayTimeOut(timeout, data, res){
     // don't overwrite the torrent's infohash even though they will both be the same
     delete checkProperty.infoHash
     checkProperty.folder = folderPath
-    checkProperty.side = true
     for (const prop in checkProperty) {
       checkTorrent[prop] = checkProperty[prop]
     }
@@ -440,7 +434,6 @@ delayTimeOut(timeout, data, res){
       })
     ])
     checkTorrent.folder = folderPath
-    checkTorrent.side = false
     checkTorrent.hash = checkTorrent.infoHash
     return checkTorrent
   }
@@ -480,7 +473,6 @@ delayTimeOut(timeout, data, res){
     ])
     checkTorrent.folder = folderPath
     checkTorrent.hash = hash
-    checkTorrent.side = true
     return { torrent: checkTorrent, hash: checkTorrent.hash }
   }
 
@@ -496,7 +488,6 @@ delayTimeOut(timeout, data, res){
     ])
 
     checkProperty.folder = path.join(this._external, checkProperty.address)
-    checkProperty.side = false
 
     // if current option is true, then if the infohash for the address is brand new then empty the directory and download the new infohash
     // if the current option is false, then at least make sure the main folder which is named with the public key address exists
@@ -585,7 +576,6 @@ delayTimeOut(timeout, data, res){
     // don't overwrite the torrent's infohash even though they will both be the same
     delete checkProperty.infoHash
     checkProperty.folder = folderPath
-    checkProperty.side = true
     for (const prop in checkProperty) {
       checkTorrent[prop] = checkProperty[prop]
     }
@@ -697,7 +687,6 @@ delayTimeOut(timeout, data, res){
     const checkedTorrent = this.findTheAddress(address)
     if (checkedTorrent) {
       const folder = checkedTorrent.folder
-      // const side = checkedTorrent.side
       this.webtorrent.remove(checkedTorrent.infoHash, { destroyStore: false })
       if (folder) {
         try {
@@ -706,13 +695,6 @@ delayTimeOut(timeout, data, res){
           console.log(error)
         }
       }
-      // if (side) {
-      //   try {
-      //     await fs.remove(this._author + path.sep + address)
-      //   } catch (error) {
-      //     console.log(error)
-      //   }
-      // }
     } else {
       if (await fs.pathExists(path.join(this._external, address))) {
         try {
