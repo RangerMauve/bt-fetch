@@ -79,7 +79,7 @@ async keepUpdated () {
       try {
         await this.bothGetPut(torrent)
       } catch (error) {
-        console.log(error)
+        console.error(error)
       }
       await new Promise((resolve, reject) => setTimeout(resolve, 5000))
     }
@@ -94,13 +94,9 @@ async startUp () {
   // a mechanism to clear all data meaning delete all user-created torrents, all non-user created torrents, and all BEP46 publishing data, most likely too extreme and not needed
 
   // if(this._clear){
-  //     try {
-  //         await fs.emptyDir(this._external)
-  //         await fs.emptyDir(this._internal)
-  //         await fs.emptyDir(this._author)
-  //     } catch (error) {
-  //         console.log(error)
-  //     }
+    // await fs.emptyDir(this._external)
+    // await fs.emptyDir(this._internal)
+    // await fs.emptyDir(this._author)
   // }
 
   // if initial option is true, then start seeding all user created torrents on start up
@@ -175,18 +171,10 @@ async startUp () {
         if (checkProperty) {
           if (this._current) {
             if (!await fs.pathExists(folderPath + path.sep + checkProperty.infoHash)) {
-              try {
-                await fs.emptyDir(folderPath)
-              } catch (error) {
-                console.log(error)
-              }
+              await fs.emptyDir(folderPath)
             }
           } else if (!this._current) {
-            try {
-              await fs.ensureDir(folderPath)
-            } catch (error) {
-              console.log(error)
-            }
+            await fs.ensureDir(folderPath)
           }
           const checkTorrent = await Promise.any([
             this.delayTimeOut(this._timeout, null, true),
@@ -227,7 +215,7 @@ async startUp () {
   }
 }
 
-delayTimeOut(timeout, data, res){
+delayTimeOut(timeout, data, res = false){
   return new Promise((resolve, reject) => {setTimeout(() => {if(res){resolve(data)} else {reject(data)}}, timeout)})
   // if(res){
   //   return new Promise((resolve, reject) => {
@@ -493,19 +481,11 @@ delayTimeOut(timeout, data, res){
     // if the current option is false, then at least make sure the main folder which is named with the public key address exists
     if (this._current) {
       if (!await fs.pathExists(checkProperty.folder + path.sep + checkProperty.infoHash)) {
-        try {
-          await fs.emptyDir(checkProperty.folder)
-        } catch (error) {
-          console.log(error)
-        }
+        await fs.emptyDir(checkProperty.folder)
       }
     } else if (!this._current) {
       if (!await fs.pathExists(checkProperty.folder)) {
-        try {
-          await fs.ensureDir(checkProperty.folder)
-        } catch (error) {
-          console.log(error)
-        }
+        await fs.ensureDir(checkProperty.folder)
       }
     }
 
@@ -653,64 +633,46 @@ delayTimeOut(timeout, data, res){
   // stop the torrent with the infohash, then fully remove all data for the torrent, if torrent is not active, then find if we have any data on disk and if we do then delete all that data
   async removeHash (hash) {
     const checkTorrent = this.findTheHash(hash)
-    if (checkTorrent) {
-      const folder = checkTorrent.folder
-      this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-      if (folder) {
-        try {
-          await fs.remove(folder)
-        } catch (error) {
-          console.log(error)
-        }
+    if(!checkTorrent){
+      throw new Error('could not find ' + hash)
+    }
+    const folder = checkTorrent.folder
+    this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
+    if (folder) {
+      if(await fs.pathExists(folder)){
+        await fs.remove(folder)
       }
     } else {
       if (await fs.pathExists(path.join(this._external, hash))) {
-        try {
-          await fs.remove(path.join(this._external, hash))
-        } catch (error) {
-          console.log(error)
-        }
+        await fs.remove(path.join(this._external, hash))
       }
       if (await fs.pathExists(path.join(this._internal, hash))) {
-        try {
-          await fs.remove(path.join(this._internal, hash))
-        } catch (error) {
-          console.log(error)
-        }
+        await fs.remove(path.join(this._internal, hash))
       }
     }
-    return hash + ' has been removed'
+    return hash + ' was removed'
   }
 
   // stop the torrent with the address, then fully remove all data for the torrent, if torrent is not active, then find if we have any data on disk and if we do then delete all that data
   async removeAddress (address) {
     const checkedTorrent = this.findTheAddress(address)
-    if (checkedTorrent) {
-      const folder = checkedTorrent.folder
-      this.webtorrent.remove(checkedTorrent.infoHash, { destroyStore: false })
-      if (folder) {
-        try {
-          await fs.remove(folder)
-        } catch (error) {
-          console.log(error)
-        }
+    if(!checkedTorrent){
+      throw new Error('could not find ' + address)
+    }
+    const folder = checkedTorrent.folder
+    this.webtorrent.remove(checkedTorrent.infoHash, { destroyStore: false })
+    if (folder) {
+      if(await fs.pathExists(folder)){
+        await fs.remove(folder)
       }
     } else {
       if (await fs.pathExists(path.join(this._external, address))) {
-        try {
-          await fs.remove(path.join(this._external, address))
-        } catch (error) {
-          console.log(error)
-        }
+        await fs.remove(path.join(this._external, address))
       }
       if (await fs.pathExists(path.join(this._internal, address))) {
-        try {
-          await fs.remove(path.join(this._internal, address))
-        } catch (error) {
-          console.log(error)
-        }
+        await fs.remove(path.join(this._internal, address))
       }
-      // if (await fs.pathExists(this._author + path.sep + address)) {
+      // if (await fs.pathExists(path.join(this._author, address))) {
       //   await fs.remove(this._author + path.sep + address)
       // }
     }
@@ -879,7 +841,7 @@ delayTimeOut(timeout, data, res){
           return parsed.hostname
         }
       } catch (error) {
-        console.log(error)
+        console.error(error)
         return ''
       }
     } else if (link.startsWith('magnet')) {
@@ -896,7 +858,7 @@ delayTimeOut(timeout, data, res){
           return xs.slice(BTPK_PREFIX.length)
         }
       } catch (error) {
-        console.log(error)
+        console.error(error)
         return ''
       }
     } else {
