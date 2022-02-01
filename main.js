@@ -103,57 +103,49 @@ async startUp () {
   if (this._initial) {
     const checkInternal = await fs.readdir(this._internal, { withFileTypes: false })
     for (const checkInternalPath of checkInternal) {
-      const folderPath = path.join(this._internal, checkInternalPath)
-      if (checkAddress.test(checkInternalPath)) {
-        const checkTorrent = await Promise.any([
-          this.delayTimeOut(this._timeout, null, true),
-          new Promise((resolve, reject) => {
-            this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
-              resolve(torrent)
-            })
-          })
-        ])
-        if (checkTorrent) {
-          checkTorrent.folder = folderPath
-          const checkProperty = await Promise.any([
-            this.delayTimeOut(this._timeout, null, true),
+      try {
+        const folderPath = path.join(this._internal, checkInternalPath)
+        if (checkAddress.test(checkInternalPath)) {
+          const checkTorrent = await Promise.race([
+            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
             new Promise((resolve, reject) => {
-              this.ownData(checkInternalPath, checkTorrent.infoHash).then(res => {
-                resolve(res)
-              }).catch(error => {
-                console.error(error)
-                // most likely the infohash of this torrent does not match what we have currently, stop this torrent
-                this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-                resolve(null)
+              this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
+                resolve(torrent)
               })
             })
           ])
-          if (checkProperty) {
-            // don't overwrite the torrent's infohash even though they will both be the same
-            delete checkProperty.infoHash
-            for (const prop in checkProperty) {
-              checkTorrent[prop] = checkProperty[prop]
-            }
-            checkTorrent.folder = folderPath
-            console.log(checkInternalPath + ' is good')
-          }
-        }
-      } else if (checkHash.test(checkInternalPath)) {
-        const checkTorrent = await Promise.any([
-          this.delayTimeOut(this._timeout, null, true),
-          new Promise((resolve, reject) => {
-            this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
-              resolve(torrent)
-            })
+          checkTorrent.folder = folderPath
+          const checkProperty = await Promise.race([
+            this.delayTimeOut(this._timeout, new Error('property took too long'), false),
+            this.ownData(checkInternalPath, checkTorrent.infoHash)
+          ]).catch(error => {
+            this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
+            throw error
           })
-        ])
-        if (checkTorrent) {
+          // don't overwrite the torrent's infohash even though they will both be the same
+          delete checkProperty.infoHash
+          for (const prop in checkProperty) {
+            checkTorrent[prop] = checkProperty[prop]
+          }
+          checkTorrent.folder = folderPath
+          console.log(checkInternalPath + ' is good')
+        } else if (checkHash.test(checkInternalPath)) {
+          const checkTorrent = await Promise.race([
+            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
+            new Promise((resolve, reject) => {
+              this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
+                resolve(torrent)
+              })
+            })
+          ])
           checkTorrent.folder = folderPath
           checkTorrent.hash = checkInternalPath
           console.log(checkInternalPath + ' is good')
+        } else {
+          await fs.remove(folderPath)
         }
-      } else {
-        await fs.remove(folderPath)
+      } catch (error) {
+        console.error(error)
       }
     }
   }
@@ -162,54 +154,52 @@ async startUp () {
   if (this._share) {
     const checkExternal = await fs.readdir(this._external, { withFileTypes: false })
     for (const checkExternalPath of checkExternal) {
-      const folderPath = path.join(this._external, checkExternalPath)
-      if (checkAddress.test(checkExternalPath)) {
-        const checkProperty = await Promise.any([
-          this.delayTimeOut(this._timeout, null, true),
-          this.resolve(checkExternalPath)
-        ])
-        if (checkProperty) {
+      try {
+        const folderPath = path.join(this._external, checkExternalPath)
+        if (checkAddress.test(checkExternalPath)) {
+          const checkProperty = await Promise.race([
+            this.delayTimeOut(this._timeout, new Error('property took too long'), false),
+            this.resolve(checkExternalPath)
+          ])
           if (this._current) {
-            if (!await fs.pathExists(folderPath + path.sep + checkProperty.infoHash)) {
+            if (!await fs.pathExists(path.join(folderPath, checkProperty.infoHash))) {
               await fs.emptyDir(folderPath)
             }
           } else if (!this._current) {
             await fs.ensureDir(folderPath)
           }
-          const checkTorrent = await Promise.any([
-            this.delayTimeOut(this._timeout, null, true),
+          const checkTorrent = await Promise.race([
+            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
             new Promise((resolve, reject) => {
               this.webtorrent.add(checkProperty.infoHash, { path: folderPath + path.sep + checkProperty.infoHash, destroyStoreOnDestroy: true }, torrent => {
                 resolve(torrent)
               })
             })
           ])
-          if (checkTorrent) {
-            checkTorrent.folder = folderPath
-            // don't overwrite the torrent's infohash even though they will both be the same
-            delete checkProperty.infoHash
-            for (const prop in checkProperty) {
-              checkTorrent[prop] = checkProperty[prop]
-            }
-            console.log(checkExternalPath + ' is good')
+          checkTorrent.folder = folderPath
+          // don't overwrite the torrent's infohash even though they will both be the same
+          delete checkProperty.infoHash
+          for (const prop in checkProperty) {
+            checkTorrent[prop] = checkProperty[prop]
           }
-        }
-      } else if (checkHash.test(checkExternalPath)) {
-        const checkTorrent = await Promise.any([
-          this.delayTimeOut(this._timeout, null, true),
-          new Promise((resolve, reject) => {
-            this.webtorrent.add(checkExternalPath, { path: folderPath, destroyStoreOnDestroy: true }, torrent => {
-              resolve(torrent)
+          console.log(checkExternalPath + ' is good')
+        } else if (checkHash.test(checkExternalPath)) {
+          const checkTorrent = await Promise.race([
+            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
+            new Promise((resolve, reject) => {
+              this.webtorrent.add(checkExternalPath, { path: folderPath, destroyStoreOnDestroy: true }, torrent => {
+                resolve(torrent)
+              })
             })
-          })
-        ])
-        if (checkTorrent) {
+          ])
           checkTorrent.folder = folderPath
           checkTorrent.hash = checkExternalPath
           console.log(checkExternalPath + ' is good')
+        } else {
+          await fs.remove(folderPath)
         }
-      } else {
-        await fs.remove(folderPath)
+      } catch (error) {
+        console.error(error)
       }
     }
   }
@@ -379,23 +369,12 @@ delayTimeOut(timeout, data, res = false){
       })
     ])
     const checkProperty = await Promise.race([
-      new Promise((resolve, reject) => {
-        this.delayTimeOut(this._timeout, new Error(address + ' property took too long, it timed out, please try again with only the keypair without the folder'), false).catch(error => {
-          this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-          reject(error)
-        })
-      }),
-      new Promise((resolve, reject) => {
-        this.ownData(address, checkTorrent.infoHash).then(res => {
-          resolve(res)
-        }).catch(error => {
-          console.error(error)
-          // most likely the infohash of this torrent does not match what we have, stop this torrent and reject the promise
-          this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-          reject(error)
-        })
-      })
-    ])
+      this.delayTimeOut(this._timeout, new Error(address + ' property took too long, it timed out, please try again with only the keypair without the folder'), false),
+      this.ownData(address, checkTorrent.infoHash)
+    ]).catch(error => {
+      this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
+      throw error
+    })
     // don't overwrite the torrent's infohash even though they will both be the same
     delete checkProperty.infoHash
     checkProperty.folder = folderPath
@@ -537,22 +516,12 @@ delayTimeOut(timeout, data, res = false){
       })
     ])
     const checkProperty = await Promise.race([
-      new Promise((resolve, reject) => {
-        this.delayTimeOut(this._timeout, new Error(keypair.address + ' property took too long, it timed out, please try again with only the keypair without the folder'), false).catch(error => {
-          this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-          reject(error)
-        })
-      }),
-      new Promise((resolve, reject) => {
-        this.publishFunc(keypair.address, keypair.secret, { ih: checkTorrent.infoHash }).then(res => {
-          resolve(res)
-        }).catch(error => {
-          // if there is an error with publishing to the dht, then stop this torrent and reject the promise
-          this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-          reject(error)
-        })
-      })
-    ])
+      this.delayTimeOut(this._timeout, new Error(keypair.address + ' property took too long, it timed out, please try again with only the keypair without the folder'), false),
+      this.publishFunc(keypair.address, keypair.secret, { ih: checkTorrent.infoHash })
+    ]).catch(error => {
+      this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
+      throw error
+    })
     // don't overwrite the torrent's infohash even though they will both be the same
     delete checkProperty.infoHash
     checkProperty.folder = folderPath
