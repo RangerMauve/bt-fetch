@@ -56,17 +56,17 @@ class Main {
     }
     this.webtorrent = new WebTorrent({ dht: { verify: ed.verify } })
     this.webtorrent.on('error', error => {
-      console.log(error)
+      console.error(error)
     })
     this._readyToGo = true
 
     // run the start up function
-    this.startUp().catch(error => { console.log(error) })
+    this.startUp().catch(error => { console.error(error) })
 
     // run the keepUpdated function every 1 hour, it keep the data active by putting the data back into the dht, don't run it if it is still working from the last time it ran the keepUpdated function
     this.updateRoutine = setInterval(() => {
       if (this._readyToGo) {
-        this.keepUpdated().catch(error => { console.log(error) })
+        this.keepUpdated().catch(error => { console.error(error) })
       }
     }, 3600000)
   }
@@ -121,7 +121,7 @@ async startUp () {
               this.ownData(checkInternalPath, checkTorrent.infoHash).then(res => {
                 resolve(res)
               }).catch(error => {
-                console.log(error)
+                console.error(error)
                 // most likely the infohash of this torrent does not match what we have currently, stop this torrent
                 this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
                 resolve(null)
@@ -389,7 +389,7 @@ delayTimeOut(timeout, data, res = false){
         this.ownData(address, checkTorrent.infoHash).then(res => {
           resolve(res)
         }).catch(error => {
-          console.log(error)
+          console.error(error)
           // most likely the infohash of this torrent does not match what we have, stop this torrent and reject the promise
           this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
           reject(error)
@@ -758,7 +758,7 @@ delayTimeOut(timeout, data, res = false){
       sha1(buffAddKey, (targetID) => {
         this.webtorrent.dht.get(targetID, (getErr, getData) => {
           if (getErr) {
-            console.log(getErr)
+            console.error(getErr)
           }
           if (getData) {
             this.webtorrent.dht.put(getData, (putErr, hash, number) => {
