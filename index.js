@@ -5,8 +5,8 @@ const streamToIterator = require('stream-async-iterator')
 const mime = require('mime/lite')
 const parseRange = require('range-parser')
 
-const checkHash = new RegExp('^[a-fA-F0-9]{40}$')
-const checkAddress = new RegExp('^[a-fA-F0-9]{64}$')
+const checkHash = /^[a-fA-F0-9]{40}$/
+const checkAddress = /^[a-fA-F0-9]{64}$/
 const DEFAULT_OPTS = {
   folder: __dirname,
   storage: 'storage',
@@ -24,15 +24,15 @@ module.exports = function makeBTFetch (opts = {}) {
 
   const prog = new Map()
 
-  async function getBody (body) {
-    let mainData = ''
+  // async function getBody (body) {
+  //   let mainData = ''
 
-    for await (const data of body) {
-      mainData += data
-    }
+  //   for await (const data of body) {
+  //     mainData += data
+  //   }
 
-    return mainData
-  }
+  //   return mainData
+  // }
 
   function getMimeType (path) {
     let mimeType = mime.getType(path) || 'text/plain'
@@ -76,11 +76,11 @@ module.exports = function makeBTFetch (opts = {}) {
       const { hostname, pathname, protocol, searchParams } = new URL(url)
 
       if (protocol !== 'bittorrent:') {
-        return {statusCode: 409, headers: {}, data: ['wrong protocol']}
-      } else if(!method || !SUPPORTED_METHODS.includes(method)){
-        return {statusCode: 409, headers: {}, data: ['something wrong with method']}
-      } else if((!hostname) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && !checkHash.test(hostname) && !checkAddress.test(hostname))){
-        return {statusCode: 409, headers: {}, data: ['something wrong with hostname']}
+        return { statusCode: 409, headers: {}, data: ['wrong protocol'] }
+      } else if (!method || !SUPPORTED_METHODS.includes(method)) {
+        return { statusCode: 409, headers: {}, data: ['something wrong with method'] }
+      } else if ((!hostname) || (hostname.length !== 1 && hostname.length !== 32 && hostname.length !== 40 && hostname.length !== 64) || (hostname.length === 1 && hostname !== hostType) || (hostname.length !== 1 && !checkHash.test(hostname) && !checkAddress.test(hostname))) {
+        return { statusCode: 409, headers: {}, data: ['something wrong with hostname'] }
       }
 
       const req = formatReq(hostname, pathname, method, searchParams, reqHeaders)
@@ -139,23 +139,23 @@ module.exports = function makeBTFetch (opts = {}) {
             if (prog.has(req.mainQuery)) {
               torrentData = prog.get(req.mainQuery)
             } else {
-              if (req.mainQuery.length === 64){
+              if (req.mainQuery.length === 64) {
                 try {
                   torrentData = await app.currentAddress(req.mainQuery)
                 } catch (error) {
                   console.log(error)
                 }
-                if(!torrentData){
+                if (!torrentData) {
                   torrentData = await app.loadAddress(req.mainQuery)
                 }
                 prog.set(torrentData.address, torrentData)
-              } else if (req.mainQuery.length === 40){
+              } else if (req.mainQuery.length === 40) {
                 try {
                   torrentData = await app.currentHash(req.mainQuery)
                 } catch (error) {
                   console.log(error)
                 }
-                if(!torrentData){
+                if (!torrentData) {
                   torrentData = await app.loadHash(req.mainQuery)
                 }
                 prog.set(torrentData.hash, torrentData)
@@ -176,7 +176,7 @@ module.exports = function makeBTFetch (opts = {}) {
                     const [{ start, end }] = ranges
                     const length = (end - start + 1)
 
-                    res.data = streamToIterator(foundFile.createReadStream({start, end}))
+                    res.data = streamToIterator(foundFile.createReadStream({ start, end }))
                     res.headers['Content-Length'] = `${length}`
                     res.headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
                   }
@@ -203,47 +203,47 @@ module.exports = function makeBTFetch (opts = {}) {
             if (!body) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>'] : [JSON.stringify('body is required')]
               res.statusCode = 400
-            } else if(!reqHeaders['content-type'] || !reqHeaders['content-type'].includes('multipart/form-data')){
+            } else if (!reqHeaders['content-type'] || !reqHeaders['content-type'].includes('multipart/form-data')) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>Content-Type header is invalud</p></div></body></html>'] : [JSON.stringify('Content-Type header is invalid')]
               res.statusCode = 400
-            } else if(req.mainUpdate === null){
+            } else if (req.mainUpdate === null) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "update" is required</p></div></body></html>'] : [JSON.stringify('url param "update" is required')]
               res.statusCode = 400
-            } else if(req.mainUpdate === true){
-                const { torrent, secret } = await app.publishAddress(null, reqHeaders, body)
-                prog.set(torrent.address, torrent)
-                res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
-                res.statusCode = 200
-            } else if(req.mainUpdate === false){
-                const { torrent, hash } = await app.publishHash(null, reqHeaders, body)
-                prog.set(torrent.hash, torrent)
-                res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.infoHash, hash })]
-                res.statusCode = 200
+            } else if (req.mainUpdate === true) {
+              const { torrent, secret } = await app.publishAddress(null, reqHeaders, body)
+              prog.set(torrent.address, torrent)
+              res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
+              res.statusCode = 200
+            } else if (req.mainUpdate === false) {
+              const { torrent, hash } = await app.publishHash(null, reqHeaders, body)
+              prog.set(torrent.hash, torrent)
+              res.data = req.mainReq ? [`<html><head><title>${torrent.hash}</title></head><body><div><p>infohash: ${torrent.infoHash}</p><p>folder: ${hash}</p></div></body></html>`] : [JSON.stringify({ infohash: torrent.infoHash, hash })]
+              res.statusCode = 200
             }
             res.headers['Content-Type'] = req.mainRes
           } else {
-            if(!body){
+            if (!body) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>body is required</p></div></body></html>'] : [JSON.stringify('body is required')]
               res.statusCode = 400
-            } else if(!reqHeaders['content-type'] || !reqHeaders['content-type'].includes('multipart/form-data')){
+            } else if (!reqHeaders['content-type'] || !reqHeaders['content-type'].includes('multipart/form-data')) {
               res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>Content-Type header is invalud</p></div></body></html>'] : [JSON.stringify('Content-Type header is invalid')]
               res.statusCode = 400
             } else {
-              if(req.mainQuery.length === 64){
-                if(!reqHeaders['authorization']){
+              if (req.mainQuery.length === 64) {
+                if (!reqHeaders.authorization) {
                   res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>secret key is required in the Authorizatiion header</p></div></body></html>'] : [JSON.stringify('secret key is needed inside the Authorization header')]
                   res.statusCode = 400
                 } else {
-                  if(prog.has(req.mainQuery)){
+                  if (prog.has(req.mainQuery)) {
                     prog.delete(req.mainQuery)
                   }
-                  const { torrent, secret } = await app.publishAddress({address: req.mainQuery, secret: reqHeaders['authorization']}, reqHeaders, body)
+                  const { torrent, secret } = await app.publishAddress({ address: req.mainQuery, secret: reqHeaders.authorization }, reqHeaders, body)
                   prog.set(torrent.address, torrent)
                   res.data = req.mainReq ? [`<html><head><title>${torrent.address}</title></head><body><div><p>address: ${torrent.address}</p><p>infohash: ${torrent.infoHash}</p><p>sequence: ${torrent.sequence}</p><p>signature: ${torrent.sig}</p><p>magnet: ${torrent.magnet}</p><p>secret: ${secret}</p></div></body></html>`] : [JSON.stringify({ address: torrent.address, infohash: torrent.infoHash, sequence: torrent.sequence, magnet: torrent.magnet, signature: torrent.sig, secret })]
                   res.statusCode = 200
                 }
-              } else if(req.mainQuery.length === 40){
-                if(prog.has(req.mainQuery)){
+              } else if (req.mainQuery.length === 40) {
+                if (prog.has(req.mainQuery)) {
                   prog.delete(req.mainQuery)
                 }
                 const { torrent, hash } = await app.publishHash(req.mainQuery, reqHeaders, body)
@@ -259,7 +259,7 @@ module.exports = function makeBTFetch (opts = {}) {
 
         case 'DELETE': {
           if (req.mainType) {
-            if(req.mainQuery){
+            if (req.mainQuery) {
               res.data = req.mainReq ? ['can not have underscore'] : [JSON.stringify('can not have underscore')]
               res.statusCode = 400
             } else {
@@ -268,11 +268,11 @@ module.exports = function makeBTFetch (opts = {}) {
             }
             res.headers['Content-Type'] = req.mainRes
           } else {
-            if(req.mainRemove === null){
-              res.data = req.mainReq ? [`<html><head><title>BT-Fetch</title></head><body><div><p>url param "remove" is required</p></div></body></html>`] : [JSON.stringify('url param "remove" is required')]
+            if (req.mainRemove === null) {
+              res.data = req.mainReq ? ['<html><head><title>BT-Fetch</title></head><body><div><p>url param "remove" is required</p></div></body></html>'] : [JSON.stringify('url param "remove" is required')]
               res.statusCode = 400
             } else {
-              if(prog.has(req.mainQuery)) {
+              if (prog.has(req.mainQuery)) {
                 prog.delete(req.mainQuery)
               }
               if (req.mainQuery.length === 64) {
@@ -296,12 +296,12 @@ module.exports = function makeBTFetch (opts = {}) {
 
   fetch.destroy = () => {
     return new Promise((resolve, reject) => {
-      clearInterval(app.updateRoutine)
       app.webtorrent.destroy(error => {
         if (error) {
           reject(error)
         } else {
-          app.webproperty.clearData().then(res => { resolve(res) }).catch(error => { reject(error) })
+          clearInterval(app.updateRoutine)
+          resolve()
         }
       })
     })

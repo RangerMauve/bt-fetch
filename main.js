@@ -22,8 +22,8 @@ function encodeSigData (msg) {
 }
 
 // setting up constants
-const checkHash = new RegExp('^[a-fA-F0-9]{40}$')
-const checkAddress = new RegExp('^[a-fA-F0-9]{64}$')
+const checkHash = /^[a-fA-F0-9]{40}$/
+const checkAddress = /^[a-fA-F0-9]{64}$/
 const defOpts = { folder: __dirname, storage: 'storage', author: 'author', external: 'external', internal: 'internal', timeout: 60000, share: false, current: true, initial: true }
 
 class Main {
@@ -71,142 +71,142 @@ class Main {
     }, 3600000)
   }
 
-// keep data active in the dht, runs every hour
-async keepUpdated () {
-  this._readyToGo = false
-  for (const torrent of this.webtorrent.torrents) {
-    if (torrent.address) {
-      try {
-        await this.bothGetPut(torrent)
-      } catch (error) {
-        console.error(error)
+  // keep data active in the dht, runs every hour
+  async keepUpdated () {
+    this._readyToGo = false
+    for (const torrent of this.webtorrent.torrents) {
+      if (torrent.address) {
+        try {
+          await this.bothGetPut(torrent)
+        } catch (error) {
+          console.error(error)
+        }
+        await new Promise((resolve, reject) => setTimeout(resolve, 5000))
       }
-      await new Promise((resolve, reject) => setTimeout(resolve, 5000))
     }
+    this._readyToGo = true
   }
-  this._readyToGo = true
-}
 
-// -------------------------------------
-// start up functions runs on every start up
-// -------------------------------------------
-async startUp () {
+  // -------------------------------------
+  // start up functions runs on every start up
+  // -------------------------------------------
+  async startUp () {
   // a mechanism to clear all data meaning delete all user-created torrents, all non-user created torrents, and all BEP46 publishing data, most likely too extreme and not needed
 
-  // if(this._clear){
+    // if(this._clear){
     // await fs.emptyDir(this._external)
     // await fs.emptyDir(this._internal)
     // await fs.emptyDir(this._author)
-  // }
+    // }
 
-  // if initial option is true, then start seeding all user created torrents on start up
-  if (this._initial) {
-    const checkInternal = await fs.readdir(this._internal, { withFileTypes: false })
-    for (const checkInternalPath of checkInternal) {
-      try {
-        const folderPath = path.join(this._internal, checkInternalPath)
-        if (checkAddress.test(checkInternalPath)) {
-          const checkTorrent = await Promise.race([
-            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
-            new Promise((resolve, reject) => {
-              this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
-                resolve(torrent)
+    // if initial option is true, then start seeding all user created torrents on start up
+    if (this._initial) {
+      const checkInternal = await fs.readdir(this._internal, { withFileTypes: false })
+      for (const checkInternalPath of checkInternal) {
+        try {
+          const folderPath = path.join(this._internal, checkInternalPath)
+          if (checkAddress.test(checkInternalPath)) {
+            const checkTorrent = await Promise.race([
+              this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
+              new Promise((resolve, reject) => {
+                this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
+                  resolve(torrent)
+                })
               })
+            ])
+            checkTorrent.folder = folderPath
+            const checkProperty = await Promise.race([
+              this.delayTimeOut(this._timeout, new Error('property took too long'), false),
+              this.ownData(checkInternalPath, checkTorrent.infoHash)
+            ]).catch(error => {
+              this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
+              throw error
             })
-          ])
-          checkTorrent.folder = folderPath
-          const checkProperty = await Promise.race([
-            this.delayTimeOut(this._timeout, new Error('property took too long'), false),
-            this.ownData(checkInternalPath, checkTorrent.infoHash)
-          ]).catch(error => {
-            this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
-            throw error
-          })
-          // don't overwrite the torrent's infohash even though they will both be the same
-          delete checkProperty.infoHash
-          for (const prop in checkProperty) {
-            checkTorrent[prop] = checkProperty[prop]
-          }
-          checkTorrent.folder = folderPath
-          console.log(checkInternalPath + ' is good')
-        } else if (checkHash.test(checkInternalPath)) {
-          const checkTorrent = await Promise.race([
-            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
-            new Promise((resolve, reject) => {
-              this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
-                resolve(torrent)
-              })
-            })
-          ])
-          checkTorrent.folder = folderPath
-          checkTorrent.hash = checkInternalPath
-          console.log(checkInternalPath + ' is good')
-        } else {
-          await fs.remove(folderPath)
-        }
-      } catch (error) {
-        console.error(error)
-      }
-    }
-  }
-
-  // if share option is true, then start seeding(webtorrent.add seeds after torrent is downloaded) on start up
-  if (this._share) {
-    const checkExternal = await fs.readdir(this._external, { withFileTypes: false })
-    for (const checkExternalPath of checkExternal) {
-      try {
-        const folderPath = path.join(this._external, checkExternalPath)
-        if (checkAddress.test(checkExternalPath)) {
-          const checkProperty = await Promise.race([
-            this.delayTimeOut(this._timeout, new Error('property took too long'), false),
-            this.resolve(checkExternalPath)
-          ])
-          if (this._current) {
-            if (!await fs.pathExists(path.join(folderPath, checkProperty.infoHash))) {
-              await fs.emptyDir(folderPath)
+            // don't overwrite the torrent's infohash even though they will both be the same
+            delete checkProperty.infoHash
+            for (const prop in checkProperty) {
+              checkTorrent[prop] = checkProperty[prop]
             }
-          } else if (!this._current) {
-            await fs.ensureDir(folderPath)
-          }
-          const checkTorrent = await Promise.race([
-            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
-            new Promise((resolve, reject) => {
-              this.webtorrent.add(checkProperty.infoHash, { path: folderPath + path.sep + checkProperty.infoHash, destroyStoreOnDestroy: true }, torrent => {
-                resolve(torrent)
+            checkTorrent.folder = folderPath
+            console.log(checkInternalPath + ' is good')
+          } else if (checkHash.test(checkInternalPath)) {
+            const checkTorrent = await Promise.race([
+              this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
+              new Promise((resolve, reject) => {
+                this.webtorrent.seed(folderPath, { destroyStoreOnDestroy: true }, torrent => {
+                  resolve(torrent)
+                })
               })
-            })
-          ])
-          checkTorrent.folder = folderPath
-          // don't overwrite the torrent's infohash even though they will both be the same
-          delete checkProperty.infoHash
-          for (const prop in checkProperty) {
-            checkTorrent[prop] = checkProperty[prop]
+            ])
+            checkTorrent.folder = folderPath
+            checkTorrent.hash = checkInternalPath
+            console.log(checkInternalPath + ' is good')
+          } else {
+            await fs.remove(folderPath)
           }
-          console.log(checkExternalPath + ' is good')
-        } else if (checkHash.test(checkExternalPath)) {
-          const checkTorrent = await Promise.race([
-            this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
-            new Promise((resolve, reject) => {
-              this.webtorrent.add(checkExternalPath, { path: folderPath, destroyStoreOnDestroy: true }, torrent => {
-                resolve(torrent)
-              })
-            })
-          ])
-          checkTorrent.folder = folderPath
-          checkTorrent.hash = checkExternalPath
-          console.log(checkExternalPath + ' is good')
-        } else {
-          await fs.remove(folderPath)
+        } catch (error) {
+          console.error(error)
         }
-      } catch (error) {
-        console.error(error)
+      }
+    }
+
+    // if share option is true, then start seeding(webtorrent.add seeds after torrent is downloaded) on start up
+    if (this._share) {
+      const checkExternal = await fs.readdir(this._external, { withFileTypes: false })
+      for (const checkExternalPath of checkExternal) {
+        try {
+          const folderPath = path.join(this._external, checkExternalPath)
+          if (checkAddress.test(checkExternalPath)) {
+            const checkProperty = await Promise.race([
+              this.delayTimeOut(this._timeout, new Error('property took too long'), false),
+              this.resolve(checkExternalPath)
+            ])
+            if (this._current) {
+              if (!await fs.pathExists(path.join(folderPath, checkProperty.infoHash))) {
+                await fs.emptyDir(folderPath)
+              }
+            } else if (!this._current) {
+              await fs.ensureDir(folderPath)
+            }
+            const checkTorrent = await Promise.race([
+              this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
+              new Promise((resolve, reject) => {
+                this.webtorrent.add(checkProperty.infoHash, { path: folderPath + path.sep + checkProperty.infoHash, destroyStoreOnDestroy: true }, torrent => {
+                  resolve(torrent)
+                })
+              })
+            ])
+            checkTorrent.folder = folderPath
+            // don't overwrite the torrent's infohash even though they will both be the same
+            delete checkProperty.infoHash
+            for (const prop in checkProperty) {
+              checkTorrent[prop] = checkProperty[prop]
+            }
+            console.log(checkExternalPath + ' is good')
+          } else if (checkHash.test(checkExternalPath)) {
+            const checkTorrent = await Promise.race([
+              this.delayTimeOut(this._timeout, new Error('torrent took too long'), false),
+              new Promise((resolve, reject) => {
+                this.webtorrent.add(checkExternalPath, { path: folderPath, destroyStoreOnDestroy: true }, torrent => {
+                  resolve(torrent)
+                })
+              })
+            ])
+            checkTorrent.folder = folderPath
+            checkTorrent.hash = checkExternalPath
+            console.log(checkExternalPath + ' is good')
+          } else {
+            await fs.remove(folderPath)
+          }
+        } catch (error) {
+          console.error(error)
+        }
       }
     }
   }
-}
 
-delayTimeOut(timeout, data, res = false){
-  return new Promise((resolve, reject) => {setTimeout(() => {if(res){resolve(data)} else {reject(data)}}, timeout)})
+  delayTimeOut (timeout, data, res = false) {
+    return new Promise((resolve, reject) => { setTimeout(() => { if (res) { resolve(data) } else { reject(data) } }, timeout) })
   // if(res){
   //   return new Promise((resolve, reject) => {
   //     setTimeout(() => {
@@ -220,7 +220,7 @@ delayTimeOut(timeout, data, res = false){
   //     }, timeout)
   //   })
   // }
-}
+  }
 
   // when we resume or seed a user created BEP46 torrent that has already been created before
   // we have to check that the infohash of the torrent(remember we do not know the infohash before) matches the signature
@@ -295,7 +295,7 @@ delayTimeOut(timeout, data, res = false){
     let seq = null
     if (await fs.pathExists(this._author + path.sep + address)) {
       main = await fs.readFile(this._author + path.sep + address)
-      main = JSON.parse(data.toString())
+      main = JSON.parse(main.toString())
       seq = main.sequence + 1
     } else {
       seq = 0
@@ -413,7 +413,7 @@ delayTimeOut(timeout, data, res = false){
   // we return the torrent along with the title
   // that way the user knows the title when they want to start the torrent
   async publishHash (hash, headers, data) {
-    if(hash){
+    if (hash) {
       this.stopHash(hash)
     } else {
       hash = crypto.randomBytes(20).toString('hex')
@@ -425,8 +425,8 @@ delayTimeOut(timeout, data, res = false){
     //   this.handleFormData(folderPath, headers, data)
     // ])
     await this.handleFormData(folderPath, headers, data)
-    const checkFolderPath = await fs.readdir(folderPath, {withFileTypes: false})
-    if(!checkFolderPath.length){
+    const checkFolderPath = await fs.readdir(folderPath, { withFileTypes: false })
+    if (!checkFolderPath.length) {
       await fs.remove(folderPath)
       throw new Error('data could not be written to new torrent')
     }
@@ -502,8 +502,8 @@ delayTimeOut(timeout, data, res = false){
     //   this.handleFormData(folderPath, headers, data)
     // ])
     await this.handleFormData(folderPath, headers, data)
-    const checkFolderPath = await fs.readdir(folderPath, {withFileTypes: false})
-    if(!checkFolderPath.length){
+    const checkFolderPath = await fs.readdir(folderPath, { withFileTypes: false })
+    if (!checkFolderPath.length) {
       await fs.remove(folderPath)
       throw new Error('data could not be written to new torrent')
     }
@@ -602,13 +602,13 @@ delayTimeOut(timeout, data, res = false){
   // stop the torrent with the infohash, then fully remove all data for the torrent, if torrent is not active, then find if we have any data on disk and if we do then delete all that data
   async removeHash (hash) {
     const checkTorrent = this.findTheHash(hash)
-    if(!checkTorrent){
+    if (!checkTorrent) {
       throw new Error('could not find ' + hash)
     }
     const folder = checkTorrent.folder
     this.webtorrent.remove(checkTorrent.infoHash, { destroyStore: false })
     if (folder) {
-      if(await fs.pathExists(folder)){
+      if (await fs.pathExists(folder)) {
         await fs.remove(folder)
       }
     } else {
@@ -625,13 +625,13 @@ delayTimeOut(timeout, data, res = false){
   // stop the torrent with the address, then fully remove all data for the torrent, if torrent is not active, then find if we have any data on disk and if we do then delete all that data
   async removeAddress (address) {
     const checkedTorrent = this.findTheAddress(address)
-    if(!checkedTorrent){
+    if (!checkedTorrent) {
       throw new Error('could not find ' + address)
     }
     const folder = checkedTorrent.folder
     this.webtorrent.remove(checkedTorrent.infoHash, { destroyStore: false })
     if (folder) {
-      if(await fs.pathExists(folder)){
+      if (await fs.pathExists(folder)) {
         await fs.remove(folder)
       }
     } else {
@@ -683,25 +683,25 @@ delayTimeOut(timeout, data, res = false){
     return tempTorrent
   }
 
-  handleFormData(folderPath, headers, data){
+  handleFormData (folderPath, headers, data) {
     const bb = busboy({ headers })
-    
+
     return new Promise((resolve, reject) => {
-      function handleRemoval(){
+      function handleRemoval () {
         bb.off('file', handleFiles)
         bb.off('error', handleErrors)
         bb.off('finish', handleFinish)
       }
-      function handleFiles(name, file, info){
+      function handleFiles (name, file, info) {
         // fs.writeFile(path.join(folderPath, info.filename), Readable.from(file))
         // const saveTo = fs.createWriteStream(path.join(folderPath, info.filename))
         Readable.from(file).pipe(fs.createWriteStream(path.join(folderPath, info.filename)))
       }
-      function handleErrors(error){
+      function handleErrors (error) {
         handleRemoval()
         reject(error)
       }
-      function handleFinish(){
+      function handleFinish () {
         handleRemoval()
         resolve(null)
       }
