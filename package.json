@@ -4,7 +4,7 @@
   "description": "Interact with Bittorrent the same way you would websites via fetch()",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test.js"
   },
   "repository": {
     "type": "git",
@@ -24,11 +24,14 @@
   },
   "homepage": "https://github.com/RangerMauve/bt-fetch#readme",
   "devDependencies": {
-    "tmp": "^0.2.1"
+    "form-data": "^4.0.0",
+    "tape": "^5.5.0",
+    "tmp-promise": "^3.0.3"
   },
   "dependencies": {
     "bencode": "^2.0.2",
     "busboy": "^1.4.0",
+    "derive-key": "^1.0.1",
     "ed25519-supercop": "^2.0.1",
     "fs-extra": "^10.0.0",
     "make-fetch": "^2.3.1",
@@ -36,6 +39,6 @@
     "range-parser": "^1.2.1",
     "simple-sha1": "^3.1.0",
     "stream-async-iterator": "^2.0.0",
-    "webtorrent": "^1.6.0"
+    "webtorrent": "^1.8.1"
   }
 }
