@@ -190,7 +190,7 @@ function findFile (torrent, filePath) {
 
 function findDirectoryFiles (torrent, directoryPath) {
   return torrent.files
-    .filter(({ path }) => path.startsWith(directoryPath))
+    .filter(({ relativePath }) => relativePath.startsWith(directoryPath))
     .map(({ relativePath }) => relativePath.slice(directoryPath.length))
     .reduce((final, file) => {
       const segments = file.split('/')
