@@ -214,13 +214,13 @@ class TorrentManager {
     let getHostname = null
     if(this.inProgressLoad.has(hostname)){
       getHostname = this.inProgressLoad.get(hostname)
-      this.inProgressLoad.delete(hostname)
+      // this.inProgressLoad.delete(hostname)
     } else if(this.byPublicKey.has(hostname)) {
       getHostname = this.byPublicKey.get(hostname)
-      this.byPublicKey.delete(hostname)
+      // this.byPublicKey.delete(hostname)
     } else if(this.byInfohash.has(hostname)){
       getHostname = this.byInfohash.get(hostname)
-      this.byInfohash.delete(hostname)
+      // this.byInfohash.delete(hostname)
     }
     return new Promise((resolve, reject) => {
       getHostname.destroy({destroyStore: true}, error => {
