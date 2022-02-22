@@ -164,16 +164,7 @@ module.exports = function makeBTFetch (opts = {}) {
   })
 
   fetch.destroy = () => {
-    return new Promise((resolve, reject) => {
-      clearInterval(torrents.updateRoutine)
-      torrents.webtorrent.destroy(error => {
-        if (error) {
-          reject(error)
-        } else {
-          resolve()
-        }
-      })
-    })
+    return torrents.destroy()
   }
 
   return fetch

@@ -14,6 +14,9 @@ const crypto = require('crypto')
 // const EventEmitter = require('events').EventEmitter
 
 const DERIVE_NAMESPACE = 'bittorrent://'
+const ERR_NOT_RESOLVE_ADDRESS = 'Could not resolve address'
+// 30 mins delay between reloading torrents
+const DEFAULT_RELOAD_INTERVAL = 1000 * 60 * 30
 
 // saves us from saving secret keys(saving secret keys even encrypted secret keys is something i want to avoid)
 // with this function which was taken from the bittorrent-dht package
@@ -30,13 +33,15 @@ const ADDRESS_REGEX = /^[a-fA-F0-9]{64}$/
 
 const defOpts = {
   folder: __dirname,
-  timeout: 60000
+  timeout: 60000,
+  reloadInterval: DEFAULT_RELOAD_INTERVAL
 }
 
 class TorrentManager {
   constructor (opts = {}) {
     const finalOpts = { ...defOpts, ...opts }
     this.timeout = finalOpts.timeout
+    this.reloadInterval = finalOpts.reloadInterval
 
     this.folder = path.resolve(finalOpts.folder)
     this.dataFolder = path.join(this.folder, 'data')
@@ -61,12 +66,7 @@ class TorrentManager {
     this.webtorrent = new WebTorrent({ dht: { verify: ed.verify } })
     this._readyToGo = true
 
-    // run the keepUpdated function every 1 hour, it keep the data active by putting the data back into the dht, don't run it if it is still working from the last time it ran the keepUpdated function
-    // this.updateRoutine = setInterval(() => {
-    //  if (this._readyToGo) {
-    //    this.keepUpdated().catch(error => { console.error(error) })
-    //  }
-    // }, 3600000)
+    this.reloadInterval = setInterval(() => this.reloadAll(), this.reloadInterval)
   }
 
   _trackTorrent (torrent) {
@@ -149,6 +149,7 @@ class TorrentManager {
         infoHash = existingRecord.v.ih.toString('hex')
         torrentFile = await this.loadTorrentFile(publicKey)
         record = existingRecord
+        sequence = existingRecord.seq
       } else {
         await this.saveRecord(publicKey, record)
       }
@@ -161,13 +162,14 @@ class TorrentManager {
       const torrent = await this.loadTorrent(torrentId, folderPath)
 
       torrent.publicKey = publicKey
+      torrent.record = record
+      torrent.sequence = sequence
       this._trackTorrent(torrent)
       await this.saveTorrentFile(torrent)
       return torrent
     } catch (e) {
       // TODO: Other messages that mean we could not resolve the address?
-      if (!e.message.includes('Could not resolve address')) throw e
-      console.error(e.stack)
+      if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS)) throw e
 
       // If it fails, try loading record from cache
       // Use saved torrent file (underpublickey) to load the torrent
@@ -219,6 +221,50 @@ class TorrentManager {
     })
   }
 
+  async reloadAll () {
+    const all = [...this.byPublicKey.values()]
+    await Promise.all(all.map((torrent) => this.reloadTorrent(torrent)))
+  }
+
+  async reloadTorrent (torrent) {
+    const { publicKey } = torrent
+    const loader = this._reloadTorrent(torrent)
+    // If the frontend sends a request while we're reloading, make it wait
+    this.inProgressLoad.set(publicKey, loader)
+
+    try {
+      await loader
+    } finally {
+      this.inProgressLoad.delete(publicKey)
+    }
+  }
+
+  async _reloadTorrent (torrent) {
+    // Do a DHT get to see if there's a new version (compare sequence)
+    const { publicKey } = torrent
+    try {
+      const { sequence } = await this.resolvePublicKey(publicKey)
+
+      if (sequence > torrent.sequence) {
+        // If there's a new version destroy the torrent and load it again
+        await new Promise((resolve, reject) => {
+          torrent.destroy((err) => {
+            if (err) reject(err)
+            else resolve()
+          })
+        })
+        return this.loadFromPublicKey(publicKey)
+      } else {
+        // If there isn't do a DHT put with the existing record
+        await this.dhtPut(torrent.record)
+        return torrent
+      }
+    } catch {
+      // ToDO: Handle errors?
+      return torrent
+    }
+  }
+
   async publishPublicKey (publicKey, secretKey, headers, data, pathname = '/', name = 'bt-fetch torrent') {
     if (this.byPublicKey.has(publicKey)) {
       await new Promise((resolve, reject) => {
@@ -228,9 +274,9 @@ class TorrentManager {
         })
       })
     } else {
-      // Try loading for the first time
       try {
-        const torrent = await this.loadFromPublicKey(publicKey)
+        // Try loading existing state so we can fetch the name out
+        const torrent = await this.resolveTorrent(publicKey)
 
         name = torrent.name
 
@@ -242,7 +288,9 @@ class TorrentManager {
         })
       } catch (e) {
         // Whatever?
-        console.error(e.stack)
+        if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS)) {
+          console.error(e.stack)
+        }
       }
     }
     const folderPath = path.join(this.dataFolder, publicKey, name)
@@ -292,7 +340,9 @@ class TorrentManager {
       }
     } catch (e) {
       // Whatever?
-      console.error(e)
+      if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS)) {
+        console.error(e)
+      }
     }
 
     // Generate record and publish
@@ -352,21 +402,23 @@ class TorrentManager {
   async dhtGet (publicKey) {
     try {
       const record = await new Promise((resolve, reject) => {
-        sha1(publicKey, (targetID) => {
+        sha1(Buffer.from(publicKey, 'hex'), (targetID) => {
           this.webtorrent.dht.get(targetID, (err, res) => {
             if (err) {
               reject(err)
             } else if (res) {
               resolve(res)
             } else if (!res) {
-              reject(new Error('Could not resolve address'))
+              reject(new Error(ERR_NOT_RESOLVE_ADDRESS))
             }
           })
         })
       })
       return record
     } catch (e) {
-      console.error('Could not load DHT record', e.stack)
+      if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS)) {
+        console.error('Could not load DHT record', e.stack)
+      }
       const record = await this.loadRecord(publicKey)
       if (record) return record
       throw e
@@ -375,7 +427,7 @@ class TorrentManager {
 
   async dhtPut (data) {
     return new Promise((resolve, reject) => {
-      this.webtorrent.dht.put(data, (err, hash) => {
+      this.webtorrent.dht.put(data, (err, hash, nodes) => {
         if (err) {
           reject(err)
         } else {
@@ -503,6 +555,19 @@ class TorrentManager {
       publicKey: publicKey.toString('hex'),
       secretKey: secretKey.toString('hex')
     }
+  }
+
+  async destroy () {
+    clearInterval(this.reloadInterval)
+    return new Promise((resolve, reject) => {
+      this.webtorrent.destroy(error => {
+        if (error) {
+          reject(error)
+        } else {
+          resolve()
+        }
+      })
+    })
   }
 }
 
