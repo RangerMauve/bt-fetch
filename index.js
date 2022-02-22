@@ -7,7 +7,7 @@ const parseRange = require('range-parser')
 const HASH_REGEX = /^[a-fA-F0-9]{40}$/
 const ADDRESS_REGEX = /^[a-fA-F0-9]{64}$/
 const PETNAME_REGEX = /^(?:-|[a-zA-Z0-9]|_)+$/
-const DOMAIN_REGEX = /^(?:-|[a-zA-Z0-9]|\.)+$/
+// const DOMAIN_REGEX = /^(?:-|[a-zA-Z0-9]|\.)+$/
 const META_HOSTNAME = '$'
 const DEFAULT_OPTS = {
   folder: __dirname,
@@ -36,7 +36,8 @@ module.exports = function makeBTFetch (opts = {}) {
       const isFormData = reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')
       const isPetname = PETNAME_REGEX.test(hostname)
       // Domains must have at least one `.` to differentiate them from petnames
-      const isDomain = !isPetname && DOMAIN_REGEX.test(hostname)
+      // This will come in handy once we get DNSLink working
+      // const isDomain = !isPetname && DOMAIN_REGEX.test(hostname)
 
       function formatResponse (statusCode, responseData = '') {
         const data = [responseData]
@@ -123,7 +124,7 @@ module.exports = function makeBTFetch (opts = {}) {
           if (!isFormData) {
             throw new Error('Must specify multipart/form-data in body')
           }
-          const torrent = await torrents.publishHash(reqHeaders, body)
+          const torrent = await torrents.publishHash(reqHeaders, body, pathname)
           return formatResponse(200, `bittorrent://${torrent.infoHash}/`)
         } else {
           if (!isFormData) {
@@ -132,23 +133,17 @@ module.exports = function makeBTFetch (opts = {}) {
           if (isInfohash) {
             throw new Error('Cannot update immutable torrents')
           }
-          /*
-          // TODO: Support publishing to public key
-          if (isPublicKey && !reqHeaders.authorization) {
-            throw new Error('Must specify secret key in the `authorization` field')
-          }
-          let publicKey = hostname
-          let secret = reqHeaders.authorization
-          let name = hostname
-          if (searchParams.has('title')) {
-            name = searchParams.get('title')
-          }
-          */
-          if (!isPetname) {
+          let { publicKey, secretKey } = torrents.createKeypair(hostname)
+          if (isPublicKey) {
+            if (!reqHeaders.authorization) {
+              throw new Error('Must specify secret key in authorization header')
+            }
+            publicKey = hostname
+            secretKey = reqHeaders.authorization
+          } else if (!isPetname) {
             throw new Error('Public keys not supported yet')
           }
-          const { publicKey, secretKey } = torrents.createKeypair(hostname)
-          const torrent = await torrents.publishPublicKey(publicKey, secretKey, reqHeaders, body, hostname)
+          const torrent = await torrents.publishPublicKey(publicKey, secretKey, reqHeaders, body, pathname, hostname)
           return formatResponse(200, `bittorrent://${torrent.publicKey}/`)
         }
       } else if (method === 'DELETE') {

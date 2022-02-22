@@ -3,7 +3,7 @@ const tmp = require('tmp')
 const FormData = require('form-data')
 const makeBTFetch = require('./')
 
-tmp.setGracefulCleanup()
+tmp.setGracefulCleanup(true)
 const folder = tmp.dirSync({ prefix: 'btfetch_example' }).name
 
 const TEST_DATA = 'Hello World!'
@@ -99,7 +99,67 @@ test('Create a torrent using FormData to petname', async (t) => {
   }
 })
 
-test('Test loading a well-seeded file', async (t) => {
+test('Upload to subfolder with petname', async (t) => {
+  const fetch = makeBTFetch({
+    folder
+  })
+
+  try {
+    const form1 = new FormData()
+
+    form1.append('file', TEST_DATA, {
+      filename: 'example.txt'
+    })
+
+    const body1 = form1.getBuffer()
+    const headers1 = form1.getHeaders()
+
+    const response1 = await fetch('bittorrent://example2/', {
+      method: 'POST',
+      headers: headers1,
+      body: body1
+    })
+
+    // Resolve public key from response headers
+
+    t.ok(response1.ok, 'Successful response')
+    const createdURL1 = await response1.text()
+    t.equal(createdURL1.length, 'bittorrent://'.length + 64 + 1, 'Bittorrent URL is expected length')
+    t.ok(createdURL1.startsWith('bittorrent://'), 'got new bittorrent URL back')
+
+    const form2 = new FormData()
+
+    form2.append('file', TEST_DATA, {
+      filename: 'index.md'
+    })
+
+    const body2 = form2.getBuffer()
+    const headers2 = form2.getHeaders()
+
+    const response2 = await fetch('bittorrent://example2/subfolder/', {
+      method: 'POST',
+      headers: headers2,
+      body: body2
+    })
+
+    // Resolve public key from response headers
+    t.ok(response2.ok, 'Successful response')
+    const createdURL2 = await response2.text()
+    t.equal(createdURL2.length, 'bittorrent://'.length + 64 + 1, 'Bittorrent URL is expected length')
+    t.ok(createdURL2.startsWith('bittorrent://'), 'got new bittorrent URL back')
+    t.equal(createdURL1, createdURL2, 'URL consistent after uploads')
+
+    const listResponse = await fetch(createdURL1)
+    t.ok(listResponse.ok, 'able to list directory')
+    const files = await listResponse.json()
+    const expectedFiles = ['example.txt', 'subfolder/'].sort()
+    t.deepEqual(files.sort(), expectedFiles.sort(), 'Got listing of uploaded files')
+  } finally {
+    await fetch.destroy()
+  }
+})
+
+test.skip('Test loading a well-seeded file', async (t) => {
   const fetch = makeBTFetch({
     folder
   })
