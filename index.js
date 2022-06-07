@@ -58,7 +58,7 @@ module.exports = function makeBTFetch (opts = {}) {
         return formatResponse(statusCode, html)
       }
 
-      if (protocol !== 'bittorrent:') {
+      if (protocol !== 'bittorrent:' && protocol !== 'bt:') {
         return formatResponse(409, 'wrong protocol')
       } else if (!method || !SUPPORTED_METHODS.includes(method)) {
         return formatResponse(409, 'something wrong with method')

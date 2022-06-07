@@ -1,12 +1,12 @@
 # bt-fetch
-Interact with Bittorrent the same way you would websites via fetch() and `bittorrent://` URLs
+Interact with Bittorrent the same way you would websites via fetch() and `bittorrent://` or `bt://` URLs
 
 ## How it works
 
 - Uses WebTorrent to load torrents
-- `bt://` URLs put the `infohash` of a torrent into the `hostname` portion
-- `bt://` URLs can contain an individual file to prioritize downloading
-- `bt://` URLs can point to a path
+- `bittorrent://` URLs put the `infohash` of a torrent into the `hostname` portion
+- `bittorrent://` URLs can contain an individual file to prioritize downloading
+- `bittorrent://` URLs can point to a folder path to get a listing
 
 ## API
 
@@ -48,7 +48,6 @@ const pubRes = fetch('bittorrent://1e267e045c1abcb9af26df782a048a1cfd2d26e6db23f
 - Pass querystring params from magnet link info (trackers, etc)
 - Support `index.html` resolution (with opt-out)
 - Creating torrents using POST
-- Mutable torrents (GET / POST)
 - Mutable torrent record exchange (updates without DHT polling)
-- Figure out what to do about Magnet Links
-- Support some sort of DNS?
+- Support some sort of DNS based on DNSLink
+- Extension messages with EventSource a-la hypercore-fetch
