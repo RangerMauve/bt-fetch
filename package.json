@@ -1,10 +1,11 @@
 {
   "name": "bt-fetch",
-  "version": "2.0.0",
+  "version": "2.0.3",
   "description": "Interact with Bittorrent the same way you would websites via fetch()",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test.js",
+    "lint": "standard --fix"
   },
   "repository": {
     "type": "git",
@@ -23,15 +24,23 @@
     "url": "https://github.com/RangerMauve/bt-fetch/issues"
   },
   "homepage": "https://github.com/RangerMauve/bt-fetch#readme",
-  "dependencies": {
-    "make-fetch": "^2.3.1",
-    "mime": "^2.5.2",
-    "range-parser": "^1.2.1",
-    "stream-async-iterator": "^2.0.0",
-    "webproperty": "^1.6.3",
-    "webtorrent": "^0.116.0"
-  },
   "devDependencies": {
-    "tmp": "^0.2.1"
+    "form-data": "^4.0.0",
+    "standard": "^17.0.0",
+    "tape": "^5.5.0",
+    "tmp-promise": "^3.0.3"
+  },
+  "dependencies": {
+    "bencode": "^2.0.2",
+    "busboy": "^1.4.0",
+    "derive-key": "^1.0.1",
+    "ed25519-supercop": "^2.0.1",
+    "fs-extra": "^10.0.0",
+    "make-fetch": "^2.3.1",
+    "mime": "^3.0.0",
+    "range-parser": "^1.2.1",
+    "simple-sha1": "^3.1.0",
+    "stream-async-iterator": "^2.0.0",
+    "webtorrent": "^1.8.1"
   }
 }

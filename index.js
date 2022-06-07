@@ -1,287 +1,225 @@
 const makeFetch = require('make-fetch')
-const WebTorrent = require('webtorrent')
-const {WebProperty, verify} = require('webproperty/lookup.js')
+const TorrentManager = require('./torrent-manager.js')
+const streamToIterator = require('stream-async-iterator')
 const mime = require('mime/lite')
-const nodeStreamToIterator = require('stream-async-iterator')
 const parseRange = require('range-parser')
 
-module.exports = makeBTFetch
+const HASH_REGEX = /^[a-fA-F0-9]{40}$/
+const ADDRESS_REGEX = /^[a-fA-F0-9]{64}$/
+const PETNAME_REGEX = /^(?:-|[a-zA-Z0-9]|_)+$/
+// const DOMAIN_REGEX = /^(?:-|[a-zA-Z0-9]|\.)+$/
+const META_HOSTNAME = 'localhost'
+const DEFAULT_OPTS = {
+  folder: __dirname,
+  storage: 'storage',
+  author: 'author'
+}
 
-// 30 seconds to get a torrent takes a while. 😅
-const DEFAULT_TIMEOUT = 30 * 1000
-const INFO_HASH_MATCH = /^[a-f0-9]{40}$/ig
+const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'HEAD']
 
-function makeBTFetch ({
-  storageLocation,
-  loadTimeout = DEFAULT_TIMEOUT,
-  ...opts
-} = {}) {
-  if(opts.dht){
-    opts.dht.verify = verify
-  } else {
-    opts.dht = {verify}
-  }
-  const client = new WebTorrent(opts)
-  const domain = new WebProperty({dht: client.dht, check: false})
+module.exports = function makeBTFetch (opts = {}) {
+  const finalOpts = { ...DEFAULT_OPTS, ...opts }
 
-  // Promises for torrents currently being loaded
-  const getting = new Map()
-  // Map of infoHash to torrent
-  const torrents = new Map()
+  const torrents = new TorrentManager(finalOpts)
 
-  async function getTorrent (infoHash) {
-    if (torrents.has(infoHash)) return torrents.get(infoHash)
-    if (getting.has(infoHash)) return getting.get(infoHash)
-
-    const promise = Promise.race([
-      new Promise((resolve, reject) => {
-        setTimeout(() => {
-          reject(new Error(`Timed out: ${infoHash} after ${loadTimeout}ms`))
-        }, loadTimeout)
-      }),
-      new Promise((resolve, reject) => {
-        const finalOpts = { ...opts }
-        const torrentInfo = {
-          infoHash,
-          // Disable loading any files on start
-          // https://github.com/webtorrent/webtorrent/issues/164#issuecomment-703489174
-          so: '-1'
-        }
-        if (storageLocation) finalOpts.path = storageLocation + infoHash
-        client.add(torrentInfo, finalOpts, (torrent) => {
-          resolve(torrent)
-        })
-      })
-    ])
-
-    getting.set(infoHash, promise)
-
-    try {
-      const torrent = await promise
-      torrents.set(infoHash, torrent)
-
-      // Load data sparsely by default
-      torrent.files.forEach(file => file.deselect())
-      torrent.deselect(0, torrent.pieces.length - 1, false)
-
-      return torrent
-    } finally {
-      getting.delete(infoHash)
+  const fetch = makeFetch(async ({ url, method, headers: reqHeaders, body }) => {
+    const { hostname, pathname, protocol } = new URL(url)
+    const headers = {
+      'Content-Type': 'text/plain; charset=utf-8'
     }
-  }
-
-  async function getFile (infoHash, filePath) {
-    const torrent = await getTorrent(infoHash)
-
-    return torrent.files.find(({ path }) => path === filePath)
-  }
-
-  async function getDirectoryFiles (infoHash, directoryPath) {
-    const torrent = await getTorrent(infoHash)
-
-    return torrent.files.filter(({ path }) => path.startsWith(directoryPath))
-  }
-
-  const fetch = makeFetch(async (request) => {
-    const {
-      url,
-      method,
-      headers: reqHeaders
-    } = request
     try {
-      const {
-        hostname,
-        pathname,
-        protocol
-      } = new URL(url)
-      if (protocol !== 'bittorrent:') {
-        throw new Error('Invalid protocol, must be `bittorrent:`')
-      }
-      let infoHash = hostname
-      let path = pathname.slice(1)
+      const isInfohash = hostname.length === 40 && HASH_REGEX.test(hostname)
+      const isPublicKey = hostname.length === 64 && ADDRESS_REGEX.test(hostname)
+      const isSpecialHostname = hostname === META_HOSTNAME
+      const isHEAD = method === 'HEAD'
+      const isWebframe = reqHeaders.accept && reqHeaders.accept.includes('text/html')
+      const isFormData = reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')
+      const isPetname = !isInfohash && !isPublicKey && !isSpecialHostname && PETNAME_REGEX.test(hostname)
+      // Domains must have at least one `.` to differentiate them from petnames
+      // This will come in handy once we get DNSLink working
+      // const isDomain = !isPetname && DOMAIN_REGEX.test(hostname)
 
-      const headers = {}
-
-      if (!infoHash) {
-      // Pathname must look like `
-        const parts = pathname.slice(2).split('/')
-        infoHash = parts[0]
-        path = parts.slice(1).join('/')
-      }
-
-      if(infoHash && infoHash.length === 64){
-        infoHash = await new Promise((resolve, reject) => {
-          domain.resolve(infoHash, (error, data) => {
-            if(error){
-              reject(null)
-            } else {
-              resolve(data.infoHash)
-            }
-          })
-        })
-      }
-
-      if (!infoHash || !infoHash.match(INFO_HASH_MATCH)) {
-        throw new Error('Infohash must be 40 char hex string')
-      }
-
-      if (method === 'HEAD') {
-        if (path.endsWith('/')) {
-          // TODO: index.html resolution
-          const files = await getDirectoryFiles(infoHash, path)
-          if (!files.length) {
-            return {
-              statusCode: 404,
-              headers,
-              data: []
-            }
-          }
-          const wantsHTML = reqHeaders.accept && reqHeaders.accept.includes('text/html')
-          const contentType = wantsHTML ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-          headers['Content-Type'] = contentType
-          return {
-            statusCode: 200,
-            headers,
-            data: []
-          }
-        } else {
-          const file = await getFile(infoHash, path)
-          if (!file) {
-            return {
-              statusCode: 404,
-              headers,
-              data: []
-            }
-          }
-          headers['Content-Type'] = getMimeType(path)
-          headers['Content-Length'] = `${file.length}`
-          headers['Accept-Ranges'] = 'bytes'
-          headers['X-Downloaded'] = `${file.downloaded}`
-          return {
-            statusCode: 200,
-            headers,
-            data: []
-          }
+      function formatResponse (statusCode, responseData = '') {
+        const data = [responseData]
+        return {
+          statusCode,
+          headers,
+          data
         }
-      } else if (method === 'GET') {
-        if (path.endsWith('/') || !path) {
-          // TODO: index.html resolution
-          const files = await getDirectoryFiles(infoHash, path)
-          if (!files.length) {
-            return { statusCode: 404, headers, data: [] }
+      }
+
+      function formatJSON (statusCode, json = {}) {
+        headers['Content-Type'] = 'application/json; charset=utf-8'
+        return formatResponse(statusCode, JSON.stringify(json, null, '\t'))
+      }
+
+      function formatHTML (statusCode, html = '') {
+        headers['Content-Type'] = 'text/html; charset=utf-8'
+        return formatResponse(statusCode, html)
+      }
+
+      if (protocol !== 'bittorrent:') {
+        return formatResponse(409, 'wrong protocol')
+      } else if (!method || !SUPPORTED_METHODS.includes(method)) {
+        return formatResponse(409, 'something wrong with method')
+      } else if (!hostname && !isSpecialHostname && !isInfohash && !isPublicKey) {
+        return formatResponse(409, 'Hostname must be an infohash, a public key, or the $ folder')
+      }
+
+      // TODO handle isDomain
+
+      const rangeHeader = reqHeaders.Range || reqHeaders.range
+
+      if ((method === 'GET') || isHEAD) {
+        if (isSpecialHostname) {
+          if (isHEAD) return formatResponse(200)
+          // TODO: List active torrents?
+          return formatResponse(200, isWebframe ? '' : 'Thank you for using BT-Fetch')
+        } else {
+          let toResolveHostname = hostname
+          if (isPetname) {
+            const { publicKey } = torrents.createKeypair(hostname)
+            toResolveHostname = publicKey
           }
-          const wantsHTML = reqHeaders.accept && reqHeaders.accept.includes('text/html')
-          const contentType = wantsHTML ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8'
-          headers['Content-Type'] = contentType
-          // TODO: Account for folders
+          const torrent = await torrents.resolveTorrent(toResolveHostname)
+          const canonical = `bittorrent://${torrent.infoHash}${pathname || '/'}`
+          headers.Link = `<${canonical}>; rel="canonical"`
 
-          const filePaths = files
-            .map(({ path: filePath }) => filePath.slice(path.length))
-            .reduce((final, file) => {
-              const segments = file.split('/')
-              // TODO: Concat is probably slow as hell
-              // If the file is directly within this path, add it to the list
-              if (segments.length === 1) return final.concat(file)
+          const foundFile = findFile(torrent, pathname)
+          if (foundFile) {
+            headers['Content-Type'] = getMimeType(pathname)
+            headers['Content-Length'] = foundFile.length
+            if (rangeHeader) {
+              const ranges = parseRange(foundFile.length, rangeHeader)
+              if (ranges && ranges.length && ranges.type === 'bytes') {
+                const [{ start, end }] = ranges
+                const length = (end - start + 1)
 
-              // We've got a file that's in a subfolder of some length
-              // We only want to list a folder that's directly within the path
-              const subpath = segments[0] + '/'
+                headers['Content-Length'] = `${length}`
+                headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
 
-              // If we've already seen a path in this subfolder, ignore this file
-              if (final.includes(subpath)) return final
-              return final.concat(subpath)
-            }, [])
-          if (wantsHTML) {
-            return {
-              statusCode: 200,
-              headers,
-              data: [
-                Buffer.from(`
+                const data = isHEAD ? [] : streamToIterator(foundFile.createReadStream({ start, end }))
+                return { statusCode: 206, headers, data }
+              } else {
+                const data = isHEAD ? [] : streamToIterator(foundFile.createReadStream())
+                return { statusCode: 200, headers, data }
+              }
+            } else {
+              const data = isHEAD ? [] : streamToIterator(foundFile.createReadStream())
+              return { statusCode: 200, headers, data }
+            }
+          } else {
+            // Try finding files in directory
+            // TODO: Resolve index files
+            const directoryPath = pathname.endsWith('/') ? pathname : (pathname + '/')
+            const files = findDirectoryFiles(torrent, directoryPath)
+            // If no files are found that means the directory doesn't exist
+            if (!files.length) {
+              const notFoundError = new Error('Not found')
+              notFoundError.statusCode = 404
+              throw notFoundError
+            }
+
+            if (isWebframe) {
+              const indexPage = `
 <!DOCTYPE html>
 <title>${url}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <h1>Index of ${pathname}</h1>
 <ul>
-  <li><a href="../">../</a></li>${filePaths.map((file) => `
-  <li><a href="./${file}">${file}</a></li>`).join('')}
+  <li><a href="../">../</a></li>${files.map((file) => `
+  <li><a href="${file}">./${file}</a></li>
+`).join('')}
 </ul>
-`, 'utf8')
-              ]
+`
+              return formatHTML(200, indexPage)
             }
-          } else {
-            return {
-              statusCode: 200,
-              headers,
-              data: [
-                Buffer.from(JSON.stringify(filePaths), 'utf8')
-              ]
-            }
-          }
-        } else {
-          const file = await getFile(infoHash, path)
 
-          if (!file) {
-            return {
-              statusCode: 404,
-              headers,
-              data: ['Not Found']
-            }
-          }
-
-          headers['Content-Type'] = getMimeType(path)
-          headers['Accept-Ranges'] = 'bytes'
-          headers['Content-Length'] = `${file.length}`
-          // TODO: Should this respond to range requests?
-          headers['X-Downloaded'] = `${file.downloaded}`
-          const isRanged = reqHeaders.Range || reqHeaders.range
-          const readOpts = {}
-          const statusCode = isRanged ? 206 : 200
-
-          if (isRanged) {
-            const ranges = parseRange(file.length, isRanged)
-            if (ranges && ranges.length && ranges.type === 'bytes') {
-              const [{ start, end }] = ranges
-              const length = (end - start + 1)
-              headers['Content-Length'] = `${length}`
-              headers['Content-Range'] = `bytes ${start}-${end}/${file.length}`
-              readOpts.start = start
-              readOpts.end = end
-            }
-          }
-
-          return {
-            statusCode,
-            headers,
-            // WebTorrent streams use readable-stream instead of node
-            // They aren't async-iterable yet, so we have to wrap
-            data: nodeStreamToIterator(file.createReadStream(readOpts))
+            return formatJSON(200, files)
           }
         }
-      }
-
-      return {
-        statusCode: 400,
-        headers,
-        data: ['Something went wrong']
+      } else if (method === 'POST') {
+        if (isSpecialHostname) {
+          if (!body) throw new Error('Must specify body for uploads')
+          if (!isFormData) {
+            throw new Error('Must specify multipart/form-data in body')
+          }
+          const torrent = await torrents.publishHash(reqHeaders, body, pathname)
+          return formatResponse(200, `bittorrent://${torrent.infoHash}/`)
+        } else {
+          if (!isFormData) {
+            throw new Error('Must specify multipart/form-data in body')
+          }
+          if (isInfohash) {
+            throw new Error('Cannot update immutable torrents')
+          }
+          let { publicKey, secretKey } = torrents.createKeypair(hostname)
+          if (isPublicKey) {
+            if (!reqHeaders.authorization) {
+              throw new Error('Must specify secret key in authorization header')
+            }
+            publicKey = hostname
+            secretKey = reqHeaders.authorization
+          } else if (!isPetname) {
+            throw new Error('Public keys require a secret key in the authorization header to update')
+          }
+          const torrent = await torrents.publishPublicKey(publicKey, secretKey, reqHeaders, body, pathname, hostname)
+          return formatResponse(200, `bittorrent://${torrent.publicKey}/`)
+        }
+      } else if (method === 'DELETE') {
+        if (isSpecialHostname) {
+          throw new Error('Must specify address')
+        } else {
+          await torrents.deleteTorrent(hostname)
+          return formatResponse(200, 'OK')
+        }
+      } else {
+        return formatResponse(409, 'Method not allowed')
       }
     } catch (e) {
-      return {
-        statusCode: 500,
-        data: [e.stack]
-      }
+      console.error(e.stack)
+      const statusCode = e.statusCode ? e.statusCode : 500
+      return { statusCode, headers, data: [e.stack] }
     }
   })
 
   fetch.destroy = () => {
-    return new Promise((resolve, reject) => {
-      client.destroy((err) => {
-        if (err) reject(err)
-        else resolve()
-      })
-    })
+    return torrents.destroy()
   }
 
   return fetch
+}
+
+function findFile (torrent, filePath) {
+  return torrent.files
+    .find(({ relativePath }) => sanitizePath(relativePath) === filePath)
+}
+
+function findDirectoryFiles (torrent, directoryPath) {
+  return torrent.files
+    .filter(({ relativePath }) => sanitizePath(relativePath).startsWith(directoryPath))
+    .map(({ relativePath }) => sanitizePath(relativePath).slice(directoryPath.length))
+    .reduce((final, file) => {
+      const segments = file.split('/')
+      // TODO: Concat is probably slow as hell
+      // If the file is directly within this path, add it to the list
+      if (segments.length === 1) return final.concat(file)
+
+      // We've got a file that's in a subfolder of some length
+      // We only want to list a folder that's directly within the path
+      const subpath = segments[0] + '/'
+
+      // If we've already seen a path in this subfolder, ignore this file
+      if (final.includes(subpath)) return final
+      return final.concat(subpath)
+    }, [])
+}
+
+const WINDOWS_DELIMITER = /\\/g
+const LINUX_DELIMITER = '/'
+
+function sanitizePath (relativePath) {
+  return relativePath.replace(WINDOWS_DELIMITER, LINUX_DELIMITER)
 }
 
 function getMimeType (path) {
