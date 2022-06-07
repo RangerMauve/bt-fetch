@@ -49,7 +49,7 @@ test('Create a torrent using FormData to bittorrent://localhost/, check files', 
       const fileURL = new URL(fileName, createdURL).href
       const getResponse = await fetch(fileURL)
       const fileData = await getResponse.text()
-      t.equal(fileData, TEST_DATA, 'Got expected file data')
+      t.equal(fileData, TEST_DATA, 'Got expected file data ' + fileName)
     }
   } finally {
     await fetch.destroy()
@@ -98,7 +98,7 @@ test('Create a torrent using FormData to petname', async (t) => {
       const fileURL = new URL(fileName, createdURL).href
       const getResponse = await fetch(fileURL)
       const fileData = await getResponse.text()
-      t.equal(fileData, TEST_DATA, 'Got expected file data')
+      t.equal(fileData, TEST_DATA, 'Got expected file data ' + fileName)
     }
   } finally {
     await fetch.destroy()
@@ -160,6 +160,49 @@ test('Upload to subfolder with petname', async (t) => {
     const files = await listResponse.json()
     const expectedFiles = ['example.txt', 'subfolder/'].sort()
     t.deepEqual(files.sort(), expectedFiles.sort(), 'Got listing of uploaded files')
+  } finally {
+    await fetch.destroy()
+  }
+})
+
+test('Re-load petname archive after closing it', async (t) => {
+  let fetch = makeBTFetch({
+    folder
+  })
+
+  try {
+    const form = new FormData()
+
+    form.append('file', TEST_DATA, {
+      filename: 'example.txt'
+    })
+
+    const body = form.getBuffer()
+    const headers = form.getHeaders()
+
+    const response = await fetch('bittorrent://examplereload/', {
+      method: 'POST',
+      headers,
+      body
+    })
+
+    // Resolve public key from response headers
+
+    t.ok(response.ok, 'Successful response')
+    await response.text()
+
+    await fetch.destroy()
+
+    fetch = makeBTFetch({
+      folder
+    })
+
+    const response2 = await fetch('bittorrent://examplereload/example.txt')
+
+    t.ok(response2, 'Able to load file back up')
+    const text = await response2.text()
+
+    t.equal(text, TEST_DATA, 'Data got loaded back')
   } finally {
     await fetch.destroy()
   }

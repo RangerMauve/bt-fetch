@@ -113,12 +113,16 @@ class TorrentManager {
     const isInfohash = hostname.length === 40 && HASH_REGEX.test(hostname)
     const isPublicKey = hostname.length === 64 && ADDRESS_REGEX.test(hostname)
     if (isInfohash) {
-      if (this.byInfohash.has(hostname)) return this.byInfohash.get(hostname)
+      if (this.byInfohash.has(hostname)) {
+        return this.byInfohash.get(hostname)
+      }
       return this.loadFromInfoHash(hostname)
     } else if (isPublicKey) {
-      if (this.byPublicKey.has(hostname)) return this.byPublicKey.get(hostname)
+      if (this.byPublicKey.has(hostname)) {
+        return this.byPublicKey.get(hostname)
+      }
       return this.loadFromPublicKey(hostname)
-    }
+    } else throw new Error('Unknown hostname type')
   }
 
   async loadFromInfoHash (infoHash) {

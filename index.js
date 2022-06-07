@@ -76,7 +76,12 @@ module.exports = function makeBTFetch (opts = {}) {
           // TODO: List active torrents?
           return formatResponse(200, isWebframe ? '' : 'Thank you for using BT-Fetch')
         } else {
-          const torrent = await torrents.resolveTorrent(hostname)
+          let toResolveHostname = hostname
+          if (isPetname) {
+            const { publicKey } = torrents.createKeypair(hostname)
+            toResolveHostname = publicKey
+          }
+          const torrent = await torrents.resolveTorrent(toResolveHostname)
           const canonical = `bittorrent://${torrent.infoHash}${pathname || '/'}`
           headers.Link = `<${canonical}>; rel="canonical"`
 
@@ -156,7 +161,7 @@ module.exports = function makeBTFetch (opts = {}) {
             publicKey = hostname
             secretKey = reqHeaders.authorization
           } else if (!isPetname) {
-            throw new Error('Public keys not supported yet')
+            throw new Error('Public keys require a secret key in the authorization header to update')
           }
           const torrent = await torrents.publishPublicKey(publicKey, secretKey, reqHeaders, body, pathname, hostname)
           return formatResponse(200, `bittorrent://${torrent.publicKey}/`)
@@ -186,13 +191,14 @@ module.exports = function makeBTFetch (opts = {}) {
 }
 
 function findFile (torrent, filePath) {
-  return torrent.files.find(({ relativePath }) => relativePath === filePath)
+  return torrent.files
+    .find(({ relativePath }) => sanitizePath(relativePath) === filePath)
 }
 
 function findDirectoryFiles (torrent, directoryPath) {
   return torrent.files
-    .filter(({ relativePath }) => relativePath.startsWith(directoryPath))
-    .map(({ relativePath }) => relativePath.slice(directoryPath.length))
+    .filter(({ relativePath }) => sanitizePath(relativePath).startsWith(directoryPath))
+    .map(({ relativePath }) => sanitizePath(relativePath).slice(directoryPath.length))
     .reduce((final, file) => {
       const segments = file.split('/')
       // TODO: Concat is probably slow as hell
@@ -207,6 +213,13 @@ function findDirectoryFiles (torrent, directoryPath) {
       if (final.includes(subpath)) return final
       return final.concat(subpath)
     }, [])
+}
+
+const WINDOWS_DELIMITER = /\\/g
+const LINUX_DELIMITER = '/'
+
+function sanitizePath (relativePath) {
+  return relativePath.replace(WINDOWS_DELIMITER, LINUX_DELIMITER)
 }
 
 function getMimeType (path) {
