@@ -34,7 +34,7 @@ module.exports = function makeBTFetch (opts = {}) {
       const isHEAD = method === 'HEAD'
       const isWebframe = reqHeaders.accept && reqHeaders.accept.includes('text/html')
       const isFormData = reqHeaders['content-type'] && reqHeaders['content-type'].includes('multipart/form-data')
-      const isPetname = PETNAME_REGEX.test(hostname)
+      const isPetname = !isInfohash && !isPublicKey && !isSpecialHostname && PETNAME_REGEX.test(hostname)
       // Domains must have at least one `.` to differentiate them from petnames
       // This will come in handy once we get DNSLink working
       // const isDomain = !isPetname && DOMAIN_REGEX.test(hostname)
