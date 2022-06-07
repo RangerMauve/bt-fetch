@@ -8,7 +8,7 @@ const HASH_REGEX = /^[a-fA-F0-9]{40}$/
 const ADDRESS_REGEX = /^[a-fA-F0-9]{64}$/
 const PETNAME_REGEX = /^(?:-|[a-zA-Z0-9]|_)+$/
 // const DOMAIN_REGEX = /^(?:-|[a-zA-Z0-9]|\.)+$/
-const META_HOSTNAME = '$'
+const META_HOSTNAME = 'localhost'
 const DEFAULT_OPTS = {
   folder: __dirname,
   storage: 'storage',
