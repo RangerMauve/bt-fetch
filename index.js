@@ -23,7 +23,7 @@ module.exports = function makeBTFetch (opts = {}) {
   const torrents = new TorrentManager(finalOpts)
 
   const fetch = makeFetch(async ({ url, method, headers: reqHeaders, body }) => {
-    const { hostname, pathname, protocol, searchParams } = new URL(url)
+    const { hostname, pathname, protocol } = new URL(url)
     const headers = {
       'Content-Type': 'text/plain; charset=utf-8'
     }
@@ -113,6 +113,21 @@ module.exports = function makeBTFetch (opts = {}) {
               const notFoundError = new Error('Not found')
               notFoundError.statusCode = 404
               throw notFoundError
+            }
+
+            if (isWebframe) {
+              const indexPage = `
+<!DOCTYPE html>
+<title>${url}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<h1>Index of ${pathname}</h1>
+<ul>
+  <li><a href="../">../</a></li>${files.map((file) => `
+  <li><a href="${file}">./${file}</a></li>
+`).join('')}
+</ul>
+`
+              return formatHTML(200, indexPage)
             }
 
             return formatJSON(200, files)

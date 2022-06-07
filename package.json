@@ -4,7 +4,8 @@
   "description": "Interact with Bittorrent the same way you would websites via fetch()",
   "main": "index.js",
   "scripts": {
-    "test": "node test.js"
+    "test": "node test.js",
+    "lint": "standard --fix"
   },
   "repository": {
     "type": "git",
@@ -25,6 +26,7 @@
   "homepage": "https://github.com/RangerMauve/bt-fetch#readme",
   "devDependencies": {
     "form-data": "^4.0.0",
+    "standard": "^17.0.0",
     "tape": "^5.5.0",
     "tmp-promise": "^3.0.3"
   },

@@ -45,7 +45,7 @@ test('Create a torrent using FormData to bittorrent://localhost/, check files', 
     const expectedFiles = ['example.txt', 'example2.txt'].sort()
     t.deepEqual(files.sort(), expectedFiles.sort(), 'Got listing of uploaded files')
 
-    for(const fileName of files) {
+    for (const fileName of files) {
       const fileURL = new URL(fileName, createdURL).href
       const getResponse = await fetch(fileURL)
       const fileData = await getResponse.text()
@@ -71,10 +71,6 @@ test('Create a torrent using FormData to petname', async (t) => {
     form.append('file', TEST_DATA, {
       filename: 'example2.txt'
     })
-    // TODO: Figure out subfolders, might only work for mutable torrents?
-    form.append('file', TEST_DATA, {
-      filename: 'foldler/example.md'
-    })
 
     const body = form.getBuffer()
     const headers = form.getHeaders()
@@ -95,8 +91,15 @@ test('Create a torrent using FormData to petname', async (t) => {
     const listResponse = await fetch(createdURL)
     t.ok(listResponse.ok, 'able to list directory')
     const files = await listResponse.json()
-    const expectedFiles = ['example.txt', 'example2.txt', 'example.md'].sort()
+    const expectedFiles = ['example.txt', 'example2.txt'].sort()
     t.deepEqual(files.sort(), expectedFiles.sort(), 'Got listing of uploaded files')
+
+    for (const fileName of files) {
+      const fileURL = new URL(fileName, createdURL).href
+      const getResponse = await fetch(fileURL)
+      const fileData = await getResponse.text()
+      t.equal(fileData, TEST_DATA, 'Got expected file data')
+    }
   } finally {
     await fetch.destroy()
   }
