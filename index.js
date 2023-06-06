@@ -11,7 +11,7 @@ const PETNAME_REGEX = /^(?:-|[a-zA-Z0-9]|_)+$/
 export const META_HOSTNAME = 'localhost'
 export const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'HEAD']
 
-export TorrentManager
+export {TorrentManager}
 
 export default function makeBTFetch (opts = {}) {
   const torrents = new TorrentManager(opts)
