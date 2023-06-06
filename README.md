@@ -11,16 +11,18 @@ Interact with Bittorrent the same way you would websites via fetch() and `bittor
 ## API
 
 ```JavaScript
-const fetch = require('bt-fetch')({
+import makeBTFetch from 'bt-fetch'
+
+const fetch = makeBTFetch({
   // Use this if you want things to be downloaded somewhere specific
-  storageLocation: '~/.local/data/bt-fetch/'
+  folder: '~/.local/data/bt-fetch/'
   // You can also pass any arguments from `new WebTorrent` and `client.add`
 })
 
 // Get a file as text
 const res = fetch('bittorrent://08ada5a7a6183aae1e09d831df6748d566095a10/example.html')
 
-const cotent = await res.text()
+const content = await res.text()
 
 // How big is the file in bytes (useful in HEAD requests)
 const length = res.headers.get('Content-Length')

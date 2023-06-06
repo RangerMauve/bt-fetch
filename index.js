@@ -8,9 +8,10 @@ const HASH_REGEX = /^[a-fA-F0-9]{40}$/
 const ADDRESS_REGEX = /^[a-fA-F0-9]{64}$/
 const PETNAME_REGEX = /^(?:-|[a-zA-Z0-9]|_)+$/
 // const DOMAIN_REGEX = /^(?:-|[a-zA-Z0-9]|\.)+$/
-const META_HOSTNAME = 'localhost'
+export const META_HOSTNAME = 'localhost'
+export const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'HEAD']
 
-const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'HEAD']
+export TorrentManager
 
 export default function makeBTFetch (opts = {}) {
   const torrents = new TorrentManager(opts)
