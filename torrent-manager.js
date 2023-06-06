@@ -324,29 +324,29 @@ export default class TorrentManager {
     return this.loadFromPublicKey(publicKey)
   }
 
+  async stopSeedingPublicKey (publicKey) {
+    if (!this.byPublicKey.has(publicKey)) {
+      return false
+    }
+    await new Promise((resolve, reject) => {
+      const torrent = this.byPublicKey.get(publicKey)
+      torrent.destroy((err) => {
+        if (err) reject(err)
+        else resolve(true)
+      })
+    })
+  }
+
   async publishPublicKey (publicKey, secretKey, headers, data, pathname = '/', name = 'bt-fetch torrent') {
     if (this.byPublicKey.has(publicKey)) {
-      await new Promise((resolve, reject) => {
-        const torrent = this.byPublicKey.get(publicKey)
-        name = torrent.name
-        torrent.destroy((err) => {
-          if (err) reject(err)
-          else resolve()
-        })
-      })
+      const torrent = this.byPublicKey.get(publicKey)
+      name = torrent.name
     } else {
       try {
         // Try loading existing state so we can fetch the name out
         const torrent = await this.resolveTorrent(publicKey)
 
         name = torrent.name
-
-        await new Promise((resolve, reject) => {
-          torrent.destroy((err) => {
-            if (err) reject(err)
-            else resolve()
-          })
-        })
       } catch (e) {
         // Whatever?
         if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS) && !e.message.includes(ERR_COULD_NOT_RESOLVE_TORRENT)) {
@@ -354,6 +354,8 @@ export default class TorrentManager {
         }
       }
     }
+
+    await this.stopSeedingPublicKey(publicKey)
 
     const folderPath = path.join(this.dataFolder, publicKey, name)
     const savePath = path.join(folderPath, pathname)
