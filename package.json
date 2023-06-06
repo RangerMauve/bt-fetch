@@ -3,8 +3,9 @@
   "version": "3.1.1",
   "description": "Interact with Bittorrent the same way you would websites via fetch()",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "node test.js",
+    "test": "wtfnode test.js",
     "lint": "standard --fix"
   },
   "repository": {
@@ -27,7 +28,8 @@
   "devDependencies": {
     "form-data": "^4.0.0",
     "standard": "^17.0.0",
-    "tape": "^5.5.0"
+    "tape": "^5.5.0",
+    "wtfnode": "^0.9.1"
   },
   "dependencies": {
     "bencode": "^2.0.2",
@@ -41,6 +43,6 @@
     "simple-sha1": "^3.1.0",
     "stream-async-iterator": "^2.0.0",
     "tmp-promise": "^3.0.3",
-    "webtorrent": "^1.8.1"
+    "webtorrent": "^2.0.34"
   }
 }

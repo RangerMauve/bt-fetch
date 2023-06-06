@@ -1,20 +1,18 @@
-const WebTorrent = require('webtorrent')
-const fs = require('fs-extra')
-const path = require('path')
-const sha1 = require('simple-sha1')
-const ed = require('ed25519-supercop')
-const derive = require('derive-key')
-const bencode = require('bencode')
-const busboy = require('busboy')
-const { Readable } = require('stream')
-const tmp = require('tmp-promise')
-const crypto = require('crypto')
-
-// const {EventIterator} = require('event-iterator')
-// const EventEmitter = require('events').EventEmitter
+import WebTorrent from 'webtorrent'
+import fs from 'fs-extra'
+import path from 'path'
+import sha1 from 'simple-sha1'
+import ed from 'ed25519-supercop'
+import derive from 'derive-key'
+import bencode from 'bencode'
+import busboy from 'busboy'
+import { Readable } from 'stream'
+import tmp from 'tmp-promise'
+import crypto from 'crypto'
 
 const DERIVE_NAMESPACE = 'bittorrent://'
 const ERR_NOT_RESOLVE_ADDRESS = 'Could not resolve address'
+const ERR_COULD_NOT_RESOLVE_TORRENT = 'Could not resolve torrent'
 // 30 mins delay between reloading torrents
 const DEFAULT_RELOAD_INTERVAL = 1000 * 60 * 30
 
@@ -31,15 +29,15 @@ function encodeSigData (msg) {
 const HASH_REGEX = /^[a-fA-F0-9]{40}$/
 const ADDRESS_REGEX = /^[a-fA-F0-9]{64}$/
 
-const defOpts = {
-  folder: __dirname,
+const DEFAULT_OPTS = {
+  folder: './',
   timeout: 60000,
   reloadInterval: DEFAULT_RELOAD_INTERVAL
 }
 
-class TorrentManager {
+export default class TorrentManager {
   constructor (opts = {}) {
-    const finalOpts = { ...defOpts, ...opts }
+    const finalOpts = { ...DEFAULT_OPTS, ...opts }
     this.timeout = finalOpts.timeout
     this.reloadInterval = finalOpts.reloadInterval
 
@@ -63,10 +61,14 @@ class TorrentManager {
     this.byInfohash = new Map()
     this.byPublicKey = new Map()
 
-    this.webtorrent = new WebTorrent({ dht: { verify: ed.verify } })
+    function verify (signature, message, publicKey) {
+      return ed.verify(signature, Buffer.from(message), publicKey)
+    }
+
+    this.webtorrent = new WebTorrent({ dht: { verify } })
     this._readyToGo = true
 
-    this.reloadInterval = setInterval(() => this.reloadAll(), this.reloadInterval)
+    this.reloadTimer = setInterval(() => this.reloadAll(), this.reloadInterval)
   }
 
   _trackTorrent (torrent) {
@@ -171,14 +173,14 @@ class TorrentManager {
       this._trackTorrent(torrent)
       await this.saveTorrentFile(torrent)
       return torrent
-    } catch (e) {
+    } catch (cause) {
       // TODO: Other messages that mean we could not resolve the address?
-      if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS)) throw e
+      if (!cause.message.includes(ERR_NOT_RESOLVE_ADDRESS)) throw cause
 
       // If it fails, try loading record from cache
       // Use saved torrent file (underpublickey) to load the torrent
       // TODO: Check error type?
-      if (!existingRecord) throw new Error('Could not resolve torrent')
+      if (!existingRecord) throw new Error(ERR_COULD_NOT_RESOLVE_TORRENT, { cause })
 
       const torrentFile = await this.loadTorrentFile(publicKey)
 
@@ -200,14 +202,15 @@ class TorrentManager {
       addUID: false
     }
 
-    const torrent = await Promise.race([
-      delayTimeout(this.timeout, new Error('Timeout: torrent took too long to load')),
+    const torrent = await withTimeout(
       new Promise((resolve, reject) => {
         this.webtorrent.add(torrentId, options, torrent => {
           resolve(torrent)
         })
-      })
-    ])
+      }),
+      this.timeout,
+      new Error('Timeout: torrent took too long to load')
+    )
 
     return torrent
   }
@@ -269,50 +272,16 @@ class TorrentManager {
     }
   }
 
-  async publishPublicKey (publicKey, secretKey, headers, data, pathname = '/', name = 'bt-fetch torrent') {
-    if (this.byPublicKey.has(publicKey)) {
-      await new Promise((resolve, reject) => {
-        this.byPublicKey.get(publicKey).destroy((err) => {
-          if (err) reject(err)
-          else resolve()
-        })
-      })
-    } else {
-      try {
-        // Try loading existing state so we can fetch the name out
-        const torrent = await this.resolveTorrent(publicKey)
-
-        name = torrent.name
-
-        await new Promise((resolve, reject) => {
-          torrent.destroy((err) => {
-            if (err) reject(err)
-            else resolve()
-          })
-        })
-      } catch (e) {
-        // Whatever?
-        if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS)) {
-          console.error(e.stack)
-        }
-      }
+  async republishPublicKey (publicKey, secretKey, opts = {}) {
+    const { name } = opts
+    if (!name) {
+      throw new Error('Must specify torrent name for publishing')
     }
     const folderPath = path.join(this.dataFolder, publicKey, name)
-    const savePath = path.join(folderPath, pathname)
-    await fs.ensureDir(savePath)
-
-    const {
-      comment,
-      createdBy = 'bt-fetch',
-      creationDate
-    } = await this.handleFormData(savePath, headers, data)
 
     // TODO: Support "info" field?
     const finalOpts = {
-      name,
-      comment,
-      createdBy,
-      creationDate,
+      ...opts,
       addUID: false
     }
 
@@ -353,6 +322,57 @@ class TorrentManager {
     await this.dhtPublish(publicKey, secretKey, infoHash, sequence)
 
     return this.loadFromPublicKey(publicKey)
+  }
+
+  async publishPublicKey (publicKey, secretKey, headers, data, pathname = '/', name = 'bt-fetch torrent') {
+    if (this.byPublicKey.has(publicKey)) {
+      await new Promise((resolve, reject) => {
+        const torrent = this.byPublicKey.get(publicKey)
+        name = torrent.name
+        torrent.destroy((err) => {
+          if (err) reject(err)
+          else resolve()
+        })
+      })
+    } else {
+      try {
+        // Try loading existing state so we can fetch the name out
+        const torrent = await this.resolveTorrent(publicKey)
+
+        name = torrent.name
+
+        await new Promise((resolve, reject) => {
+          torrent.destroy((err) => {
+            if (err) reject(err)
+            else resolve()
+          })
+        })
+      } catch (e) {
+        // Whatever?
+        if (!e.message.includes(ERR_NOT_RESOLVE_ADDRESS) && !e.message.includes(ERR_COULD_NOT_RESOLVE_TORRENT)) {
+          console.error(e.stack)
+        }
+      }
+    }
+
+    const folderPath = path.join(this.dataFolder, publicKey, name)
+    const savePath = path.join(folderPath, pathname)
+    await fs.ensureDir(savePath)
+
+    const {
+      comment,
+      createdBy = 'bt-fetch',
+      creationDate
+    } = await this.handleFormData(savePath, headers, data)
+
+    const finalOpts = {
+      name,
+      comment,
+      createdBy,
+      creationDate
+    }
+
+    return this.republishPublicKey(publicKey, secretKey, finalOpts)
   }
 
   async publishHash (headers, data, pathname = '/', title = 'bt-fetch torrent') {
@@ -562,7 +582,7 @@ class TorrentManager {
   }
 
   async destroy () {
-    clearInterval(this.reloadInterval)
+    clearInterval(this.reloadTimer)
     return new Promise((resolve, reject) => {
       this.webtorrent.destroy(error => {
         if (error) {
@@ -575,16 +595,23 @@ class TorrentManager {
   }
 }
 
-function delayTimeout (timeout, data, shouldResolve = false) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (shouldResolve) {
-        resolve(data)
-      } else {
-        reject(data)
-      }
-    }, timeout)
-  })
-}
+async function withTimeout (promise, timeout, data, shouldResolve = false) {
+  let timeoutId = null
+  function clear () {
+    clearTimeout(timeoutId)
+  }
 
-module.exports = TorrentManager
+  promise.then(clear, clear)
+  return Promise.race([
+    promise,
+    new Promise((resolve, reject) => {
+      timeoutId = setTimeout(() => {
+        if (shouldResolve) {
+          resolve(data)
+        } else {
+          reject(data)
+        }
+      }, timeout)
+    })
+  ])
+}

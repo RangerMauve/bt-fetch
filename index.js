@@ -1,26 +1,19 @@
-const makeFetch = require('make-fetch')
-const TorrentManager = require('./torrent-manager.js')
-const streamToIterator = require('stream-async-iterator')
-const mime = require('mime/lite')
-const parseRange = require('range-parser')
+import makeFetch from 'make-fetch'
+import TorrentManager from './torrent-manager.js'
+import streamToIterator from 'stream-async-iterator'
+import mime from 'mime/lite.js'
+import parseRange from 'range-parser'
 
 const HASH_REGEX = /^[a-fA-F0-9]{40}$/
 const ADDRESS_REGEX = /^[a-fA-F0-9]{64}$/
 const PETNAME_REGEX = /^(?:-|[a-zA-Z0-9]|_)+$/
 // const DOMAIN_REGEX = /^(?:-|[a-zA-Z0-9]|\.)+$/
 const META_HOSTNAME = 'localhost'
-const DEFAULT_OPTS = {
-  folder: __dirname,
-  storage: 'storage',
-  author: 'author'
-}
 
 const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'HEAD']
 
-module.exports = function makeBTFetch (opts = {}) {
-  const finalOpts = { ...DEFAULT_OPTS, ...opts }
-
-  const torrents = new TorrentManager(finalOpts)
+export default function makeBTFetch (opts = {}) {
+  const torrents = new TorrentManager(opts)
 
   const fetch = makeFetch(async ({ url, method, headers: reqHeaders, body }) => {
     const { hostname, pathname, protocol } = new URL(url)
@@ -114,7 +107,7 @@ module.exports = function makeBTFetch (opts = {}) {
             const directoryPath = pathname.endsWith('/') ? pathname : (pathname + '/')
             const files = findDirectoryFiles(torrent, directoryPath)
             // If no files are found that means the directory doesn't exist
-            if (!files.length) {
+            if (!files.length && (pathname !== '/')) {
               const notFoundError = new Error('Not found')
               notFoundError.statusCode = 404
               throw notFoundError
@@ -146,26 +139,26 @@ module.exports = function makeBTFetch (opts = {}) {
           }
           const torrent = await torrents.publishHash(reqHeaders, body, pathname)
           return formatResponse(200, `bittorrent://${torrent.infoHash}/`)
-        } else {
-          if (!isFormData) {
-            throw new Error('Must specify multipart/form-data in body')
-          }
-          if (isInfohash) {
-            throw new Error('Cannot update immutable torrents')
-          }
-          let { publicKey, secretKey } = torrents.createKeypair(hostname)
-          if (isPublicKey) {
-            if (!reqHeaders.authorization) {
-              throw new Error('Must specify secret key in authorization header')
-            }
-            publicKey = hostname
-            secretKey = reqHeaders.authorization
-          } else if (!isPetname) {
-            throw new Error('Public keys require a secret key in the authorization header to update')
-          }
-          const torrent = await torrents.publishPublicKey(publicKey, secretKey, reqHeaders, body, pathname, hostname)
-          return formatResponse(200, `bittorrent://${torrent.publicKey}/`)
         }
+        if (!isFormData) {
+          throw new Error('Must specify multipart/form-data in body')
+        }
+        if (isInfohash) {
+          throw new Error('Cannot update immutable torrents')
+        }
+        let { publicKey, secretKey } = torrents.createKeypair(hostname)
+        if (isPublicKey) {
+          if (!reqHeaders.authorization) {
+            throw new Error('Must specify secret key in authorization header')
+          }
+          publicKey = hostname
+          secretKey = reqHeaders.authorization
+        } else if (!isPetname) {
+          throw new Error('Public keys require a secret key in the authorization header to update')
+        }
+
+        const torrent = await torrents.publishPublicKey(publicKey, secretKey, reqHeaders, body, pathname, hostname)
+        return formatResponse(200, `bittorrent://${torrent.publicKey}/`)
       } else if (method === 'DELETE') {
         if (isSpecialHostname) {
           throw new Error('Must specify address')
@@ -191,28 +184,34 @@ module.exports = function makeBTFetch (opts = {}) {
 }
 
 function findFile (torrent, filePath) {
+  const name = torrent.name
   return torrent.files
-    .find(({ relativePath }) => sanitizePath(relativePath) === filePath)
+    .find(({ path }) => sanitizePath(path) === (name + filePath))
 }
 
 function findDirectoryFiles (torrent, directoryPath) {
-  return torrent.files
-    .filter(({ relativePath }) => sanitizePath(relativePath).startsWith(directoryPath))
-    .map(({ relativePath }) => sanitizePath(relativePath).slice(directoryPath.length))
-    .reduce((final, file) => {
-      const segments = file.split('/')
-      // TODO: Concat is probably slow as hell
-      // If the file is directly within this path, add it to the list
-      if (segments.length === 1) return final.concat(file)
+  const paths = listPaths(torrent)
+  const results = []
+  for (const path of paths) {
+    // If this isn't in our current directory, ignore it
+    if (!path.startsWith(directoryPath)) continue
+    // Get the path relative to the directory
+    const subPath = path.slice(directoryPath.length)
+    // If there's still a slash, that means this is a folder
+    if (subPath.includes('/')) {
+      // Get the folder name
+      const firstLevel = subPath.slice(0, subPath.indexOf('/') + 1)
+      // If we haven't seen this folder before, track it
+      if (!results.includes(firstLevel)) {
+        results.push(firstLevel)
+      }
+    } else {
+      // Not a folder, add the file to the list
+      results.push(subPath)
+    }
+  }
 
-      // We've got a file that's in a subfolder of some length
-      // We only want to list a folder that's directly within the path
-      const subpath = segments[0] + '/'
-
-      // If we've already seen a path in this subfolder, ignore this file
-      if (final.includes(subpath)) return final
-      return final.concat(subpath)
-    }, [])
+  return results
 }
 
 const WINDOWS_DELIMITER = /\\/g
@@ -226,4 +225,11 @@ function getMimeType (path) {
   let mimeType = mime.getType(path) || 'text/plain'
   if (mimeType.startsWith('text/')) mimeType = `${mimeType}; charset=utf-8`
   return mimeType
+}
+
+function listPaths (torrent) {
+  const name = torrent.name
+  return torrent.files.map(({ path }) => {
+    return sanitizePath(path).slice(name.length)
+  })
 }

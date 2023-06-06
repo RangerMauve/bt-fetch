@@ -1,7 +1,7 @@
-const test = require('tape')
-const tmp = require('tmp')
-const FormData = require('form-data')
-const makeBTFetch = require('./')
+import test from 'tape'
+import tmp from 'tmp'
+import FormData from 'form-data'
+import makeBTFetch from './index.js'
 
 tmp.setGracefulCleanup(true)
 const folder = tmp.dirSync({ prefix: 'btfetch_example' }).name
@@ -33,14 +33,17 @@ test('Create a torrent using FormData to bittorrent://localhost/, check files', 
       body
     })
 
-    t.ok(response.ok, 'Successful response')
+    await checkOk(response, t, 'Able to create torrent')
+
     const createdURL = await response.text()
 
     t.ok(createdURL.startsWith('bittorrent://'), 'got new bittorrent URL back')
     t.equal(createdURL.length, 'bittorrent://'.length + 40 + 1, 'Bittorrent URL is expected length')
 
     const listResponse = await fetch(createdURL)
-    t.ok(listResponse.ok, 'able to list directory')
+
+    await checkOk(listResponse, t, 'able to list directory')
+
     const files = await listResponse.json()
     const expectedFiles = ['example.txt', 'example2.txt'].sort()
     t.deepEqual(files.sort(), expectedFiles.sort(), 'Got listing of uploaded files')
@@ -48,6 +51,8 @@ test('Create a torrent using FormData to bittorrent://localhost/, check files', 
     for (const fileName of files) {
       const fileURL = new URL(fileName, createdURL).href
       const getResponse = await fetch(fileURL)
+
+      await checkOk(getResponse, t, `Able to GET ${fileName}`)
       const fileData = await getResponse.text()
       t.equal(fileData, TEST_DATA, 'Got expected file data ' + fileName)
     }
@@ -165,7 +170,7 @@ test('Upload to subfolder with petname', async (t) => {
   }
 })
 
-test('Re-load petname archive after closing it', async (t) => {
+test('Re-load petname torrent after closing it', async (t) => {
   let fetch = makeBTFetch({
     folder
   })
@@ -208,7 +213,7 @@ test('Re-load petname archive after closing it', async (t) => {
   }
 })
 
-test.skip('Test loading a well-seeded file', async (t) => {
+test('Test loading a well-seeded file', async (t) => {
   const fetch = makeBTFetch({
     folder
   })
@@ -223,7 +228,6 @@ test.skip('Test loading a well-seeded file', async (t) => {
     t.equal(res.status, 200, '200 OK')
 
     const files = await res.json()
-
     console.log(files)
 
     const resHTML = await fetch(url, {
@@ -259,3 +263,11 @@ test.skip('Test loading a well-seeded file', async (t) => {
     await fetch.destroy()
   }
 })
+
+async function checkOk (response, t, message = 'Response OK') {
+  if (!response.ok) {
+    t.error(await response.text())
+  } else {
+    t.pass(message)
+  }
+}
