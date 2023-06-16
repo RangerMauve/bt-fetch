@@ -40,9 +40,8 @@
     "make-fetch": "^2.3.1",
     "mime": "^3.0.0",
     "range-parser": "^1.2.1",
-    "simple-sha1": "^3.1.0",
-    "stream-async-iterator": "^2.0.0",
     "tmp-promise": "^3.0.3",
+    "uint8-util": "^2.1.9",
     "webtorrent": "^2.0.34"
   }
 }
