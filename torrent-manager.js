@@ -65,7 +65,7 @@ export default class TorrentManager {
       return ed.verify(signature, Buffer.from(message), publicKey)
     }
 
-    this.webtorrent = new WebTorrent({ dht: { verify } })
+    this.webtorrent = new WebTorrent({ dht: { verify }, ...finalOpts })
     this._readyToGo = true
 
     this.reloadTimer = setInterval(() => this.reloadAll(), this.reloadInterval)
