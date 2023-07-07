@@ -1,14 +1,13 @@
 import WebTorrent from 'webtorrent'
 import fs from 'fs-extra'
 import path from 'path'
-import sha1 from 'simple-sha1'
 import ed from 'ed25519-supercop'
 import derive from 'derive-key'
 import bencode from 'bencode'
 import busboy from 'busboy'
 import { Readable } from 'stream'
 import tmp from 'tmp-promise'
-import crypto from 'crypto'
+import { hash, randomBytes } from 'uint8-util'
 
 const DERIVE_NAMESPACE = 'bittorrent://'
 const ERR_NOT_RESOLVE_ADDRESS = 'Could not resolve address'
@@ -53,7 +52,7 @@ export default class TorrentManager {
     if (fs.existsSync(this.seedKeyFile)) {
       this.seedKey = fs.readFileSync(this.seedKeyFile)
     } else {
-      this.seedKey = crypto.randomBytes(32)
+      this.seedKey = randomBytes(32)
       fs.writeFileSync(this.seedKeyFile, this.seedKey)
     }
 
@@ -428,7 +427,7 @@ export default class TorrentManager {
   async dhtGet (publicKey) {
     try {
       const record = await new Promise((resolve, reject) => {
-        sha1(Buffer.from(publicKey, 'hex'), (targetID) => {
+        hash(Buffer.from(publicKey, 'hex')).then((targetID) => {
           this.webtorrent.dht.get(targetID, (err, res) => {
             if (err) {
               reject(err)

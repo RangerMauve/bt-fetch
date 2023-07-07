@@ -1,6 +1,5 @@
 import makeFetch from 'make-fetch'
 import TorrentManager from './torrent-manager.js'
-import streamToIterator from 'stream-async-iterator'
 import mime from 'mime/lite.js'
 import parseRange from 'range-parser'
 
@@ -11,7 +10,7 @@ const PETNAME_REGEX = /^(?:-|[a-zA-Z0-9]|_)+$/
 export const META_HOSTNAME = 'localhost'
 export const SUPPORTED_METHODS = ['GET', 'POST', 'DELETE', 'HEAD']
 
-export {TorrentManager}
+export { TorrentManager }
 
 export default function makeBTFetch (opts = {}) {
   const torrents = new TorrentManager(opts)
@@ -92,14 +91,14 @@ export default function makeBTFetch (opts = {}) {
                 headers['Content-Length'] = `${length}`
                 headers['Content-Range'] = `bytes ${start}-${end}/${foundFile.length}`
 
-                const data = isHEAD ? [] : streamToIterator(foundFile.createReadStream({ start, end }))
+                const data = isHEAD ? [] : foundFile[Symbol.asyncIterator]({ start, end })
                 return { statusCode: 206, headers, data }
               } else {
-                const data = isHEAD ? [] : streamToIterator(foundFile.createReadStream())
+                const data = isHEAD ? [] : foundFile[Symbol.asyncIterator]()
                 return { statusCode: 200, headers, data }
               }
             } else {
-              const data = isHEAD ? [] : streamToIterator(foundFile.createReadStream())
+              const data = isHEAD ? [] : foundFile[Symbol.asyncIterator]()
               return { statusCode: 200, headers, data }
             }
           } else {
